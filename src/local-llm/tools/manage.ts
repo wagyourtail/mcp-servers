@@ -267,7 +267,7 @@ export function registerManageTools(reg: Registrar, ctx: ServerContext): void {
   );
 
   reg.allow(
-    "wait",
+    "wait_job",
     {
       description:
         "Sleep for a number of seconds (max 600), then return. With job_id, returns early " +

@@ -30,7 +30,7 @@ WHEN TO USE:
 MODELS:
 - No good model? search_models + list_model_tags find one on the ollama registry,
   recommend_model picks what fits detected VRAM, pull_model downloads (job — poll
-  with wait {seconds, job_id}).
+  with wait_job {seconds, job_id}).
 
 EDITS, NOT REWRITES:
 - For localized changes prefer propose_edit/stage_edit (SEARCH/REPLACE hunks)
@@ -49,7 +49,7 @@ PRAGMATIC WRITE WORKFLOW:
   directly. Set the mode back to "propose" when done.
 - Long delegations: sync calls past agent_sync_grace_ms return a job_id instead
   of losing the result; run_async:true returns one immediately. Poll with
-  wait {seconds, job_id} (returns early on completion); steer with control_job —
+  wait_job {seconds, job_id} (returns early on completion); steer with control_job —
   inject corrections, pause, cancel.
 
 INPUT-SIZING:

@@ -17,7 +17,7 @@ The `local_llm` MCP server is expected to be registered in the session. When a t
 fits its strengths, delegate instead of doing it in-context — that's the product:
 
 - `summarize`/`map_files` for bulk file inspection; `extract`/`classify` for parsing
-  chores; `complete` for drafting pure parsers/transforms; `run_local_agent` for
+  chores; `chat` for drafting pure parsers/transforms; `run_local_agent` for
   mechanical multi-step file work.
 - Don't delegate security-sensitive logic, GPU-identity matching, or anything where a
   plausible-but-wrong answer is worse than none — small models hallucinate. `verify:"self"`

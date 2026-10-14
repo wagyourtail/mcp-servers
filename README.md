@@ -104,7 +104,7 @@ registry-managed tasks.
 | Tool | What it does |
 |---|---|
 | `run_local_agent` | **Local subagent.** Small model runs its own tool loop; returns final answer + staged op ids. `verify:"self"` adds a critique pass. Sync calls wait up to `agent_sync_grace_ms` (default 45s), then return a `job_id` instead of losing the result; `run_async:true` skips the wait and returns a job immediately (poll `get_job`). |
-| `chat` / `complete` | Raw completions passthrough. |
+| `chat` | Raw completion passthrough — `prompt`+`system` for one-shot, `messages` for full conversations. |
 | `summarize` | Summarize files/globs server-side; only summaries return. |
 | `extract` | Structured JSON extraction, optional schema validation + retry. |
 | `classify` | Label text/files into candidate labels. |
@@ -123,7 +123,7 @@ registry-managed tasks.
 | `list_model_tags` | Pullable tags for a registry model (`gemma4` → `e4b`, `12b`, `26b`, …); `include_sizes:true` fetches real download sizes via the manifest API. |
 | `pull_model` | Download a model on ollama — background job, poll `get_job`. |
 | `control_job` | Steer a running job: `pause`/`resume`/`cancel`/`inject` (inject = operator instruction the local agent sees next step). |
-| `wait` | Sleep N seconds (max 600); with `job_id` returns early when the job finishes — poll long pulls/agent runs without busy-looping `get_job`. |
+| `wait_job` | Sleep N seconds (max 600); with `job_id` returns early when the job finishes — poll long pulls/agent runs without busy-looping `get_job`. |
 | `download_model` | Download from Hugging Face via `hf` CLI (for llama.cpp/TabbyAPI/vLLM servers). Background job. |
 | `unload_model` | Free a model's VRAM. |
 | `delete_model` | Permanently delete a model (irreversible). Refuses to delete the provider default or a loaded model without `force:true`. |
@@ -164,7 +164,7 @@ override them.
 
 **Thinking models eat `max_tokens`.** On thinking-capable models (gemma4, qwen3, gpt-oss) a tight
 `max_tokens` can be consumed entirely by reasoning, returning empty `text`. Fix per call with
-`think:false`, or globally per provider with `"think": false`. `chat`/`complete` return the model's
+`think:false`, or globally per provider with `"think": false`. `chat` returns the model's
 `thinking` trace when the provider reports it, so the budget usage is observable.
 (`run_local_agent` accepts `think`/`options` too — disabling think leaves more context and steps
 for tool calls.)

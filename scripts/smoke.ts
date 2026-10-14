@@ -90,9 +90,9 @@ async function main(): Promise<void> {
   const res = await call(client, "get_system_resources");
   console.log(JSON.stringify(res).slice(0, 500));
 
-  section("complete (tiny)");
-  const comp = await call(client, "complete", { prompt: "Reply with exactly the word: PINEAPPLE", max_tokens: 10 });
-  console.log("text:", JSON.stringify(comp.text));
+  section("chat (tiny)");
+  const comp = await call(client, "chat", { prompt: "Reply with exactly the word: PINEAPPLE", max_tokens: 10 });
+  console.log("content:", JSON.stringify(comp.content));
 
   section("summarize (server-side file read)");
   const summ = await call(client, "summarize", { glob: join(work, "docs", "*.md") });

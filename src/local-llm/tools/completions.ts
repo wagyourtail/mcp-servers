@@ -18,9 +18,12 @@ export function registerCompletionTools(reg: Registrar, ctx: ServerContext): voi
     "chat",
     {
       description:
-        "Send a chat-completion request to the cheap/local model and get the response. " +
-        "Use for low-complexity work (rewrites, formatting, simple Q&A) instead of reasoning about it yourself.",
+        "Chat-completion passthrough to the cheap/local model — cheapest way to offload a small " +
+        "mechanical task. Pass `prompt` (+ optional `system`) for one-shot completions, or " +
+        "`messages` for a full OpenAI-style conversation (few-shot examples, multi-turn).",
       inputSchema: {
+        prompt: z.string().optional().describe("One-shot prompt (use this OR messages)"),
+        system: z.string().optional().describe("System prompt prepended when using prompt"),
         messages: z
           .array(
             z.object({
@@ -28,7 +31,8 @@ export function registerCompletionTools(reg: Registrar, ctx: ServerContext): voi
               content: z.string(),
             }),
           )
-          .describe("OpenAI-style message list"),
+          .optional()
+          .describe("OpenAI-style message list (use this OR prompt)"),
         response_format: z
           .union([z.literal("json"), z.record(z.string(), z.unknown())])
           .optional()
@@ -36,11 +40,20 @@ export function registerCompletionTools(reg: Registrar, ctx: ServerContext): voi
         ...COMMON,
       },
     },
-    async ({ messages, response_format, model, provider: pName, temperature, max_tokens, num_ctx, think, top_p, seed, stop, options }) => {
+    async ({ prompt, system, messages, response_format, model, provider: pName, temperature, max_tokens, num_ctx, think, top_p, seed, stop, options }) => {
+      const msgs =
+        messages ??
+        (prompt !== undefined
+          ? [
+              ...(system ? [{ role: "system" as const, content: system }] : []),
+              { role: "user" as const, content: prompt },
+            ]
+          : undefined);
+      if (!msgs?.length) throw new Error("chat requires `prompt` or `messages`");
       const { provider, model: m } = pickModel(ctx, pName, model);
       const { res, usage } = await trackedChat("chat", provider, {
         model: m,
-        messages,
+        messages: msgs,
         temperature,
         max_tokens,
         num_ctx,
@@ -57,43 +70,6 @@ export function registerCompletionTools(reg: Registrar, ctx: ServerContext): voi
         finish_reason: res.finishReason,
         usage,
       });
-    },
-  );
-
-  reg.allow(
-    "complete",
-    {
-      description:
-        "Single-shot completion: one prompt in, one response out. Cheapest way to offload a small mechanical task.",
-      inputSchema: {
-        prompt: z.string().describe("The prompt/instruction for the local model"),
-        system: z.string().optional().describe("Optional system prompt"),
-        response_format: z
-          .union([z.literal("json"), z.record(z.string(), z.unknown())])
-          .optional(),
-        ...COMMON,
-      },
-    },
-    async ({ prompt, system, response_format, model, provider: pName, temperature, max_tokens, num_ctx, think, top_p, seed, stop, options }) => {
-      const { provider, model: m } = pickModel(ctx, pName, model);
-      const messages = [
-        ...(system ? [{ role: "system" as const, content: system }] : []),
-        { role: "user" as const, content: prompt },
-      ];
-      const { res, usage } = await trackedChat("complete", provider, {
-        model: m,
-        messages,
-        temperature,
-        max_tokens,
-        num_ctx,
-        think,
-        top_p,
-        seed,
-        stop,
-        options,
-        response_format,
-      });
-      return jsonResult({ text: res.content, ...(res.thinking ? { thinking: res.thinking } : {}), usage });
     },
   );
 }
