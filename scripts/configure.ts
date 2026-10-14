@@ -43,14 +43,13 @@ const ASK_TOOLS = [
   "update_command_whitelist", "unload_model", "uncommit_write", "verify_staged",
 ].map((t) => `mcp__local_llm__${t}`);
 
-// task_runner — read-only observation is allow-tier; anything
-// that starts/signals/feeds a process is ask-tier.
-const TASK_ALLOW = ["task_list", "task_status", "task_log", "task_wait"].map(
+// task_runner — everything is scoped to tasks the registry itself started
+// (or reattached by pid), so observe/control is allow-tier. task_start is
+// the only ask-tier tool: it's the one that can create arbitrary processes.
+const TASK_ALLOW = ["task_list", "task_status", "task_log", "task_wait", "task_kill", "task_stdin"].map(
   (t) => `mcp__task_runner__${t}`,
 );
-const TASK_ASK = ["task_start", "task_kill", "task_stdin"].map(
-  (t) => `mcp__task_runner__${t}`,
-);
+const TASK_ASK = ["task_start"].map((t) => `mcp__task_runner__${t}`);
 
 interface ProviderDraft {
   type: "ollama" | "openai";
