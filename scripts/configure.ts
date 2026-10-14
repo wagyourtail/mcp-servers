@@ -340,16 +340,25 @@ async function main(): Promise<void> {
   console.log(`\nWrote ${outPath}`);
 
   // --- client install ---
-  const detected = CLIENTS.filter(clientDetected).map((c) => c.key);
   const allKeys = CLIENTS.map((c) => c.key);
-  const chosenRaw = clientsIdx >= 0
-    ? args[clientsIdx + 1]
-    : NO_INSTALL
-      ? "none"
-      : await ask(
-          `Install into which clients? (${allKeys.join("/")}, comma-separated, 'all', or 'none'; detected: ${detected.join(", ") || "none"})`,
-          "devin",
-        );
+  let chosenRaw: string;
+  if (clientsIdx >= 0) {
+    chosenRaw = args[clientsIdx + 1];
+  } else if (NO_INSTALL) {
+    chosenRaw = "none";
+  } else {
+    console.log("\nMCP clients:");
+    for (const c of CLIENTS) {
+      const found = clientDetected(c);
+      console.log(
+        `  ${found ? "●" : "○"} ${c.key.padEnd(18)} ${c.label}${found ? ` — ${c.path}` : " (not detected)"}`,
+      );
+    }
+    chosenRaw = await ask(
+      `Install into which clients? (comma-separated keys, 'all', or 'none')`,
+      "devin",
+    );
+  }
   const chosen =
     chosenRaw === "all"
       ? allKeys
