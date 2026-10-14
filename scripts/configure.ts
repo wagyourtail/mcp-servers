@@ -52,6 +52,8 @@ const TASK_ALLOW = ["task_list", "task_status", "task_log", "task_wait"].map(
 const TASK_ASK = ["task_start", "task_kill", "task_stdin"].map(
   (t) => `mcp__task_runner__${t}`,
 );
+
+interface ProviderDraft {
   type: "ollama" | "openai";
   base_url: string;
   default_model?: string;
