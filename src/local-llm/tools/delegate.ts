@@ -4,8 +4,8 @@ import type { ServerContext } from "../context.ts";
 import { pickModel } from "../context.ts";
 import { jsonResult, makeProgress, trackedChat, withTimeout, type ProgressExtra } from "./helpers.ts";
 import { recordUsage } from "../lib/usage.ts";
-import { runAgentLoop, type LocalTool } from "../lib/agent-loop.ts";
-import { buildLocalTools } from "../lib/local-tools.ts";
+import { runAgentLoop, type AgentTool } from "../agent/loop.ts";
+import { buildAgentTools } from "../agent/tools.ts";
 import { listOps } from "../lib/staging.ts";
 import { createJob, finishJob, updateJob } from "../lib/jobs.ts";
 
@@ -71,7 +71,7 @@ async function doDelegate(
       ? `task + inlined files ≈ ${estTokens} tokens vs num_ctx ${effectiveNumCtx} — the local model will likely lose the thread. Use \`paths\` instead of \`files\` or raise num_ctx.`
       : undefined;
 
-  const localTools = buildLocalTools({
+  const localTools = buildAgentTools({
     guard: ctx.guard,
     whitelist: ctx.config.command_whitelist,
     runCommandEnabled: ctx.env.runCommand,
@@ -80,7 +80,7 @@ async function doDelegate(
     runCommandOutputChars: limits.run_command_output_chars,
     searchOutputChars: limits.max_tool_result_chars,
   });
-  const tools: LocalTool[] = p.allowed_tools?.length
+  const tools: AgentTool[] = p.allowed_tools?.length
     ? localTools.filter((t) => p.allowed_tools!.includes(t.spec.name))
     : localTools;
 

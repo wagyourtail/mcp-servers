@@ -1,12 +1,12 @@
 import { stripFences } from "../tools/helpers.ts";
-import type { LocalTool } from "./agent-loop.ts";
-import type { FsGuard } from "./fs-guard.ts";
-import { stageWrite } from "./staging.ts";
-import { checkCommand, runWhitelisted, type CommandWhitelist } from "./whitelist.ts";
-import { verifyStagedOp } from "./verify.ts";
-import { searchFiles } from "./filesearch.ts";
-import { executeDynamicTool, getDynamicTool, listDynamicTools } from "./dynamic-tools.ts";
-import { applyEdits, parseEditBlocks } from "./edits.ts";
+import type { AgentTool } from "./loop.ts";
+import type { FsGuard } from "../lib/fs-guard.ts";
+import { stageWrite } from "../lib/staging.ts";
+import { checkCommand, runWhitelisted, type CommandWhitelist } from "../lib/whitelist.ts";
+import { verifyStagedOp } from "../lib/verify.ts";
+import { searchFiles } from "../lib/filesearch.ts";
+import { executeDynamicTool, getDynamicTool, listDynamicTools } from "../lib/dynamic-tools.ts";
+import { applyEdits, parseEditBlocks } from "../lib/edits.ts";
 
 const OBJ = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: "object",
@@ -15,7 +15,7 @@ const OBJ = (properties: Record<string, unknown>, required: string[] = []) => ({
   additionalProperties: false,
 });
 
-export interface LocalToolDeps {
+export interface AgentToolDeps {
   guard: FsGuard;
   whitelist: CommandWhitelist;
   runCommandEnabled: boolean;
@@ -29,10 +29,16 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + `\n...[truncated ${s.length - n} chars]` : s;
 }
 
-/** Built-in tools available to the LOCAL model during run_local_agent. */
-export function buildLocalTools(deps: LocalToolDeps): LocalTool[] {
+/**
+ * Agent-internal tools — schemas + executors the LOCAL model calls inside the
+ * run_local_agent loop. These are NOT MCP tools: they never appear in the
+ * server manifest or client permission lists. (MCP-facing tools live in
+ * ../tools/; dynamic tools registered via the register_tool MCP tool are
+ * appended here too.)
+ */
+export function buildAgentTools(deps: AgentToolDeps): AgentTool[] {
   const { guard } = deps;
-  const tools: LocalTool[] = [
+  const tools: AgentTool[] = [
     {
       spec: {
         name: "read_file",

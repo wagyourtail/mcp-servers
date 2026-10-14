@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runAgentLoop, salvageToolCalls, type LocalTool } from "../src/local-llm/lib/agent-loop.ts";
+import { runAgentLoop, salvageToolCalls, type AgentTool } from "../src/local-llm/agent/loop.ts";
 import type { ChatResult, Provider } from "../src/local-llm/providers/types.ts";
 
-const echoTool: LocalTool = {
+const echoTool: AgentTool = {
   spec: { name: "echo", description: "echo args back", parameters: { type: "object" } },
   async execute(args) {
     return `echo:${JSON.stringify(args)}`;
@@ -119,7 +119,7 @@ test("agent loop forwards think/options to provider.chat", async () => {
 });
 
 test("delegatedBytes accumulates for delegate-flagged tools only", async () => {
-  const readTool: LocalTool = {
+  const readTool: AgentTool = {
     spec: { name: "reader", description: "reads a file", parameters: { type: "object" } },
     delegates: true,
     async execute() {

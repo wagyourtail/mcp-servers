@@ -1,7 +1,7 @@
 import type { ChatMessage, Provider, ToolCall, ToolSpec, Usage } from "../providers/index.ts";
-import type { JobControl } from "./jobs.ts";
+import type { JobControl } from "../lib/jobs.ts";
 
-export interface LocalTool {
+export interface AgentTool {
   spec: ToolSpec;
   /** Results are file content — count them toward delegated_bytes. */
   delegates?: boolean;
@@ -34,7 +34,7 @@ export async function runAgentLoop(params: {
   model: string;
   system: string;
   task: string;
-  tools: LocalTool[];
+  tools: AgentTool[];
   maxSteps: number;
   temperature?: number;
   numCtx?: number;
@@ -182,7 +182,7 @@ export async function runAgentLoop(params: {
  * matches a registered tool, so a real answer that happens to be JSON isn't
  * hijacked into a spurious call.
  */
-export function salvageToolCalls(content: string, tools: Map<string, LocalTool>): ToolCall[] {
+export function salvageToolCalls(content: string, tools: Map<string, AgentTool>): ToolCall[] {
   const candidates: string[] = [];
   for (const m of content.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)) {
     candidates.push(m[1]);
