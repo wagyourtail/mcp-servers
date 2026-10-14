@@ -181,6 +181,25 @@ const CLIENTS: ClientSpec[] = [
     },
   },
   {
+    key: "junie",
+    label: "Junie (JetBrains)",
+    path: join(homedir(), ".junie", "mcp", "mcp.json"),
+    insert: mcpServersInsert,
+  },
+  {
+    key: "copilot-intellij",
+    label: "Copilot for IntelliJ",
+    path: join(homedir(), ".local", "share", "github-copilot", "intellij", "mcp.json"),
+    insert: (doc, servers) => {
+      doc.servers = {
+        ...(doc.servers ?? {}),
+        ...Object.fromEntries(
+          Object.entries(servers).map(([k, v]) => [k, { type: "stdio", ...v }]),
+        ),
+      };
+    },
+  },
+  {
     key: "zed",
     label: "Zed",
     path: join(xdg, "zed", "settings.json"),

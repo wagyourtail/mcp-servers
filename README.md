@@ -46,7 +46,7 @@ everywhere. `get_server_info` shows each root with its source.
 
 ### 2. Register with your MCP client
 
-*`npm run configure` does this for you — it detects and offers Devin, Claude Code, Cursor, Windsurf, VS Code, and Zed (`--clients devin,cursor`, `all`, or `none`). Shown here for manual setup — the `mcpServers` envelope works in Devin, Claude Code, Cursor, and Windsurf as-is.*
+*`npm run configure` does this for you — it detects and offers Devin, Claude Code, Cursor, Windsurf, VS Code, Zed, Junie (JetBrains), and Copilot-for-IntelliJ (`--clients devin,cursor`, `all`, or `none`). Shown here for manual setup — the `mcpServers` envelope works in Devin, Claude Code, Cursor, Windsurf, and Junie as-is.*
 
 **Devin settings → MCP → Add custom MCP** (or edit `~/.config/devin/mcp_config.json`):
 
@@ -75,7 +75,7 @@ CLI equivalent: `devin mcp add -s user local_llm -- node /path/to/openai-mcp/src
 
 Omit the two `LOCAL_LLM_*` env flags to disable shell access and dynamic tools entirely.
 
-Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/path/to/openai-mcp/src/index.ts", "task_runner"]}`. VS Code uses `mcp.servers` in user settings (`"type": "stdio"` on each entry); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`.
+Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/path/to/openai-mcp/src/index.ts", "task_runner"]}`. VS Code and Copilot-for-IntelliJ use a `servers` key with `"type": "stdio"` on each entry (`mcp.servers` in VS Code user settings; `~/.local/share/github-copilot/intellij/mcp.json` for Copilot); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`. IntelliJ's built-in AI Assistant stores MCP config in IDE options XML — configure it via Settings → Tools → AI Assistant → Model Context Protocol.
 
 ### 3. Recommended Devin permissions
 
