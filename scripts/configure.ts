@@ -348,15 +348,17 @@ async function main(): Promise<void> {
     chosenRaw = "none";
   } else {
     console.log("\nMCP clients:");
+    const detected: string[] = [];
     for (const c of CLIENTS) {
       const found = clientDetected(c);
+      if (found) detected.push(c.key);
       console.log(
         `  ${found ? "●" : "○"} ${c.key.padEnd(18)} ${c.label}${found ? ` — ${c.path}` : " (not detected)"}`,
       );
     }
     chosenRaw = await ask(
       `Install into which clients? (comma-separated keys, 'all', or 'none')`,
-      "devin",
+      detected.join(",") || "devin",
     );
   }
   const chosen =
