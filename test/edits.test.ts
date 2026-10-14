@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyEdits, parseEditBlocks } from "../src/lib/edits.ts";
+import { applyEdits, parseEditBlocks } from "../src/local-llm/lib/edits.ts";
 
 const BLOCK = (s: string, r: string) =>
   `<<<<<<< SEARCH\n${s}\n=======\n${r}\n>>>>>>> REPLACE`;

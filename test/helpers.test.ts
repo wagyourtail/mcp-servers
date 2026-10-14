@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stripFences, withTimeout } from "../src/tools/helpers.ts";
+import { stripFences, withTimeout } from "../src/local-llm/tools/helpers.ts";
 
 test("stripFences removes a single outer code block", () => {
   assert.equal(stripFences("```ts\nconst a = 1;\n```"), "const a = 1;");

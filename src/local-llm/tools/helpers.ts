@@ -31,12 +31,7 @@ export function setRequestTimeout(ms: number): void {
 }
 
 /** Wrap a result object as an MCP tool response (text + structured). */
-export function jsonResult(obj: Record<string, unknown>) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }],
-    structuredContent: obj,
-  };
-}
+export { jsonResult } from "../../shared/mcp.ts";
 
 /**
  * Small models love wrapping output in ``` fences — which would otherwise get

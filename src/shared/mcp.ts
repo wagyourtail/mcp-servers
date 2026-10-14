@@ -2,6 +2,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+/** Standard tool result: JSON in text + structuredContent. */
+export function jsonResult(obj: Record<string, unknown>) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }],
+    structuredContent: obj,
+  };
+}
+
 export interface ServerSpec {
   name: string;
   version?: string;

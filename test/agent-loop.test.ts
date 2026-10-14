@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runAgentLoop, salvageToolCalls, type LocalTool } from "../src/lib/agent-loop.ts";
-import type { ChatResult, Provider } from "../src/providers/types.ts";
+import { runAgentLoop, salvageToolCalls, type LocalTool } from "../src/local-llm/lib/agent-loop.ts";
+import type { ChatResult, Provider } from "../src/local-llm/providers/types.ts";
 
 const echoTool: LocalTool = {
   spec: { name: "echo", description: "echo args back", parameters: { type: "object" } },

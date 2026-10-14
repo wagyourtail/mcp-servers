@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fallbackSearch, globRe, parseGitignore } from "../src/lib/filesearch.ts";
+import { fallbackSearch, globRe, parseGitignore } from "../src/local-llm/lib/filesearch.ts";
 
 test("globRe matches typical glob shapes", () => {
   assert.ok(globRe("*.ts").test("foo.ts"));

@@ -5,7 +5,7 @@ import {
   manifestSizeBytes,
   parseSearchHtml,
   parseTagsHtml,
-} from "../src/lib/registry.ts";
+} from "../src/local-llm/lib/registry.ts";
 
 // Fixture shaped like the real ollama.com/search result block.
 const SEARCH_HTML = `

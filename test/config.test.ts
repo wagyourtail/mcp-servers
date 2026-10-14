@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ConfigSchema, loadConfig } from "../src/config.ts";
-import { validateSchema } from "../src/lib/schema-validate.ts";
+import { ConfigSchema, loadConfig } from "../src/local-llm/config.ts";
+import { validateSchema } from "../src/local-llm/lib/schema-validate.ts";
 
 test("ConfigSchema fills defaults", () => {
   const c = ConfigSchema.parse({});

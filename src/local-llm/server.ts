@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
-import { startServer } from "./lib/mcp.ts";
+import { startServer } from "../shared/mcp.ts";
 import { fileURLToPath } from "node:url";
 import { buildContext } from "./context.ts";
 import { registerCompletionTools } from "./tools/completions.ts";

@@ -1,9 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { jsonResult } from "./helpers.ts";
-import type { TaskRegistry } from "../lib/tasks.ts";
+import { jsonResult } from "../shared/mcp.ts";
+import type { TaskRegistry } from "./tasks.ts";
 
-function meta(t: import("../lib/tasks.ts").TaskMeta): Record<string, unknown> {
+function meta(t: import("./tasks.ts").TaskMeta): Record<string, unknown> {
   return {
     id: t.id,
     name: t.name,

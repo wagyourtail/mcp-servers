@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { OllamaProvider } from "../src/providers/ollama.ts";
+import { OllamaProvider } from "../src/local-llm/providers/ollama.ts";
 
 function stubFetch(handler: (url: string, body: Record<string, unknown>) => unknown): () => void {
   const orig = globalThis.fetch;

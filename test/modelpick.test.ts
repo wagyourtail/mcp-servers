@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { paramBillions, pruneCandidates, rankModels } from "../src/lib/modelpick.ts";
-import { parseNvtop } from "../src/lib/sysinfo.ts";
-import type { ModelInfo } from "../src/providers/types.ts";
+import { paramBillions, pruneCandidates, rankModels } from "../src/local-llm/lib/modelpick.ts";
+import { parseNvtop } from "../src/local-llm/lib/sysinfo.ts";
+import type { ModelInfo } from "../src/local-llm/providers/types.ts";
 
 const GB = 1e9;
 

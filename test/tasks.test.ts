@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TaskRegistry } from "../src/lib/tasks.ts";
+import { TaskRegistry } from "../src/task-runner/tasks.ts";
 
 function setup(): { dir: string; tasks: TaskRegistry } {
   const dir = mkdtempSync(join(tmpdir(), "taskd-test-"));

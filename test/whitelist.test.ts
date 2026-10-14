@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkCommand, runWhitelisted } from "../src/lib/whitelist.ts";
+import { checkCommand, runWhitelisted } from "../src/local-llm/lib/whitelist.ts";
 import { tmpdir } from "node:os";
 
 const wl = {

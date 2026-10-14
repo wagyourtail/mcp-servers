@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FsGuard } from "../src/lib/fs-guard.ts";
-import { stageWrite } from "../src/lib/staging.ts";
-import { verifyStagedOp } from "../src/lib/verify.ts";
-import type { CommandWhitelist } from "../src/lib/whitelist.ts";
+import { FsGuard } from "../src/local-llm/lib/fs-guard.ts";
+import { stageWrite } from "../src/local-llm/lib/staging.ts";
+import { verifyStagedOp } from "../src/local-llm/lib/verify.ts";
+import type { CommandWhitelist } from "../src/local-llm/lib/whitelist.ts";
 
 const WL: CommandWhitelist = {
   enabled: true,

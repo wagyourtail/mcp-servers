@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FsGuard, globToRegExp, matchesAny } from "../src/lib/fs-guard.ts";
+import { FsGuard, globToRegExp, matchesAny } from "../src/local-llm/lib/fs-guard.ts";
 
 function fixture(): { root: string; guard: FsGuard } {
   const root = mkdtempSync(join(tmpdir(), "fsguard-"));

@@ -1,7 +1,7 @@
 // task_runner MCP server — manage detached long-running processes.
-import { startServer } from "./lib/mcp.ts";
-import { TaskRegistry } from "./lib/tasks.ts";
-import { registerTaskTools } from "./tools/tasks.ts";
+import { startServer } from "../shared/mcp.ts";
+import { TaskRegistry } from "./tasks.ts";
+import { registerTaskTools } from "./tools.ts";
 
 const INSTRUCTIONS = `task_runner manages detached LONG-RUNNING processes: build watchers, dev
 servers, test loops, downloads — anything you'd otherwise run in a terminal tab

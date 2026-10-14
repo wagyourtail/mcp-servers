@@ -13,7 +13,7 @@ import {
   type DrmCard,
   type GpuInfo,
   type InferenceDevice,
-} from "../src/lib/sysinfo.ts";
+} from "../src/local-llm/lib/sysinfo.ts";
 
 // Host ground truth (from the P100/A380 bug report):
 // lspci: 00:02.0=HD630 iGPU, 01:00.0=P100, 04:00.0=A380

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FsGuard } from "../src/lib/fs-guard.ts";
-import { stageWrite, getOp, listOps, commitOp, discardOp, listCommits, revertCommit, uncommitOp } from "../src/lib/staging.ts";
+import { FsGuard } from "../src/local-llm/lib/fs-guard.ts";
+import { stageWrite, getOp, listOps, commitOp, discardOp, listCommits, revertCommit, uncommitOp } from "../src/local-llm/lib/staging.ts";
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "staging-"));
