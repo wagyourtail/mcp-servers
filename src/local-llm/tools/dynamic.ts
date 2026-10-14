@@ -16,7 +16,7 @@ import { dynamicToolsPath } from "../config.ts";
 
 export function registerDynamicToolTools(reg: Registrar, ctx: ServerContext): void {
   reg.ask(
-    "register_tool",
+    "register_agent_tool",
     {
       description:
         "Register a NEW tool that the local model can call during run_local_agent (persists for this " +
@@ -59,13 +59,13 @@ export function registerDynamicToolTools(reg: Registrar, ctx: ServerContext): vo
         registered: name,
         kind,
         persist: spec.persist,
-        note: "Now available to the local model inside run_local_agent (and listed via list_dynamic_tools).",
+        note: "Now available to the local model inside run_local_agent (and listed via list_agent_tools).",
       });
     },
   );
 
   reg.ask(
-    "unregister_tool",
+    "unregister_agent_tool",
     {
       description: "Remove a runtime-registered dynamic tool.",
       inputSchema: { name: z.string() },
@@ -78,7 +78,7 @@ export function registerDynamicToolTools(reg: Registrar, ctx: ServerContext): vo
   );
 
   reg.allow(
-    "list_dynamic_tools",
+    "list_agent_tools",
     {
       description: "List runtime-registered tools available to the local agent.",
       inputSchema: {},

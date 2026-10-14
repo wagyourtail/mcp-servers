@@ -136,8 +136,8 @@ async function main(): Promise<void> {
     console.log("REDACTED applied:", ok);
   }
 
-  section("register_tool (js) + use in agent");
-  await call(client, "register_tool", {
+  section("register_agent_tool (js) + use in agent");
+  await call(client, "register_agent_tool", {
     name: "shout",
     description: "Uppercases the input text",
     input_schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },

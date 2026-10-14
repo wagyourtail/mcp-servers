@@ -128,7 +128,7 @@ registry-managed tasks.
 | `unload_model` | Free a model's VRAM. |
 | `delete_model` | Permanently delete a model (irreversible). Refuses to delete the provider default or a loaded model without `force:true`. |
 | `prune_models` | Bulk-delete old models. `dry_run:true` (default) reports candidates + reclaimable bytes; always keeps `keep[]`, the provider default, loaded models, `keep_recent` newest, `max_age_days` recent pulls, and `unused_days` models used recently (per-model last-used is persisted to `model-usage.json` next to the config — models with no record are kept). |
-| `register_tool` / `unregister_tool` / `list_dynamic_tools` | Give the local agent new tools at runtime (`shell` templates or `js` snippets). |
+| `register_agent_tool` / `unregister_agent_tool` / `list_agent_tools` | Give the local agent new tools at runtime (`shell` templates or `js` snippets). |
 | `get_command_whitelist` / `update_command_whitelist` | Manage what `run_command` may execute. |
 | `get_usage_stats` / `get_server_info` | Session savings + effective config. |
 

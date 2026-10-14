@@ -33,7 +33,7 @@ function truncate(s: string, n: number): string {
  * Agent-internal tools — schemas + executors the LOCAL model calls inside the
  * run_local_agent loop. These are NOT MCP tools: they never appear in the
  * server manifest or client permission lists. (MCP-facing tools live in
- * ../tools/; dynamic tools registered via the register_tool MCP tool are
+ * ../tools/; dynamic tools registered via the register_agent_tool MCP tool are
  * appended here too.)
  */
 export function buildAgentTools(deps: AgentToolDeps): AgentTool[] {
