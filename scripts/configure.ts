@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(here, "..");
 const serverPath = join(projectRoot, "src", "index.ts");
+const taskdPath = join(projectRoot, "src", "taskd.ts");
 const args = argv.slice(2);
 const YES = args.includes("--yes");
 const PRINT_ONLY = args.includes("--print-devin");
@@ -44,7 +45,14 @@ const ASK_TOOLS = [
   "update_command_whitelist", "unload_model", "uncommit_write", "verify_staged",
 ].map((t) => `mcp__local_llm__${t}`);
 
-interface ProviderDraft {
+// task_runner (src/taskd.ts) — read-only observation is allow-tier; anything
+// that starts/signals/feeds a process is ask-tier.
+const TASK_ALLOW = ["task_list", "task_status", "task_log", "task_wait"].map(
+  (t) => `mcp__task_runner__${t}`,
+);
+const TASK_ASK = ["task_start", "task_kill", "task_stdin"].map(
+  (t) => `mcp__task_runner__${t}`,
+);
   type: "ollama" | "openai";
   base_url: string;
   default_model?: string;
@@ -96,6 +104,10 @@ async function probeOllama(url: string): Promise<string[]> {
 
 function serverEntry(env: Record<string, string>): object {
   return { command: "node", args: [serverPath], env };
+}
+
+function taskdEntry(): object {
+  return { command: "node", args: [taskdPath] };
 }
 
 async function main(): Promise<void> {
@@ -202,7 +214,13 @@ async function main(): Promise<void> {
 
   if (PRINT_ONLY) {
     console.log("\n--- Devin registration ---");
-    console.log(JSON.stringify({ mcpServers: { local_llm: serverEntry(env) } }, null, 2));
+    console.log(
+      JSON.stringify(
+        { mcpServers: { local_llm: serverEntry(env), task_runner: taskdEntry() } },
+        null,
+        2,
+      ),
+    );
     rl.close();
     return;
   }
@@ -214,9 +232,13 @@ async function main(): Promise<void> {
   const install = !NO_INSTALL && (YES || (await askBool(`Install into ${devinMcpPath}?`, true)));
   if (install) {
     const mcpCfg = readJson<{ mcpServers?: Record<string, unknown> }>(devinMcpPath, {});
-    mcpCfg.mcpServers = { ...(mcpCfg.mcpServers ?? {}), local_llm: serverEntry(env) };
+    mcpCfg.mcpServers = {
+      ...(mcpCfg.mcpServers ?? {}),
+      local_llm: serverEntry(env),
+      task_runner: taskdEntry(),
+    };
     writeJson(devinMcpPath, mcpCfg);
-    console.log(`Wrote server "local_llm" -> ${devinMcpPath}`);
+    console.log(`Wrote servers "local_llm" + "task_runner" -> ${devinMcpPath}`);
   }
 
   const perms = !NO_INSTALL && (YES || (await askBool(`Merge recommended permissions into ${devinConfigPath}?`, true)));
@@ -231,8 +253,8 @@ async function main(): Promise<void> {
       allow: (cfg.permissions.allow ?? []).length,
       ask: (cfg.permissions.ask ?? []).length,
     };
-    cfg.permissions.allow = merge(cfg.permissions.allow, ALLOW_TOOLS);
-    cfg.permissions.ask = merge(cfg.permissions.ask, ASK_TOOLS);
+    cfg.permissions.allow = merge(cfg.permissions.allow, [...ALLOW_TOOLS, ...TASK_ALLOW]);
+    cfg.permissions.ask = merge(cfg.permissions.ask, [...ASK_TOOLS, ...TASK_ASK]);
     writeJson(devinConfigPath, cfg);
     console.log(
       `Permissions merged: allow ${before.allow} -> ${cfg.permissions.allow.length}, ask ${before.ask} -> ${cfg.permissions.ask.length}`,
@@ -243,9 +265,15 @@ async function main(): Promise<void> {
   if (!install) {
     console.log("\n--- Devin registration (manual) ---");
     console.log("Paste into ~/.config/devin/mcp_config.json:\n");
-    console.log(JSON.stringify({ mcpServers: { local_llm: serverEntry(env) } }, null, 2));
+    console.log(
+      JSON.stringify(
+        { mcpServers: { local_llm: serverEntry(env), task_runner: taskdEntry() } },
+        null,
+        2,
+      ),
+    );
   }
-  console.log("\nDone. New Devin sessions will pick up the local_llm tools.");
+  console.log("\nDone. New Devin sessions will pick up the local_llm + task_runner tools.");
 }
 
 main().catch((e) => {

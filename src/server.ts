@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { startServer } from "./lib/mcp.ts";
 import { fileURLToPath } from "node:url";
 import { buildContext } from "./context.ts";
 import { registerCompletionTools } from "./tools/completions.ts";
@@ -17,39 +16,51 @@ import { setRequestTimeout } from "./tools/helpers.ts";
 const INSTRUCTIONS = `local_llm is a LOCAL SUBAGENT service: its tools run on a cheap local model
 (default Ollama) so YOU don't spend expensive tokens on low-complexity work.
 
-When to use it:
+WHEN TO USE:
 - Mechanical/monotonous work: summarizing, extracting, classifying, reformatting,
   boilerplate, simple rewrites, batch transforms over many files.
-- Bulk file inspection: file contents are read SERVER-SIDE and never enter your
-  context — only compact results come back (check delegated_bytes in responses).
+- Bulk file inspection: contents are read SERVER-SIDE, never enter your context —
+  only compact results come back (check delegated_bytes in responses).
 - run_local_agent delegates a whole task: the local model runs its own tool loop
-  (read/search/stage_write/whitelisted commands) and returns only a final answer.
+  (read_file/list_dir/search_files, stage_write/stage_edit, whitelisted
+  run_command, verify_staged) and returns only a final answer.
+- decide: if a decision model is installed (clef-flash/nimble/tev — check
+  list_models for 'decision' capability), prefer it over classify for labeling —
+  real probabilities per option in one pass, no parsing.
+- NOT for: real reasoning, security-sensitive changes, architecture decisions, or
+  anything where a wrong answer is worse than no answer — small models produce
+  plausible garbage. verify:"self" adds a critique pass; verify_staged runs a
+  whitelisted linter/typecheck against a staged draft.
 
-When NOT to use it: real reasoning, security-sensitive changes, architecture
-decisions, or anything where a wrong answer is worse than no answer — small models
-produce plausible garbage sometimes. Use verify:"self" for a second-pass check.
+MODELS:
+- No good model? search_models + list_model_tags find one on the ollama registry,
+  recommend_model picks what fits detected VRAM, pull_model downloads (job — poll
+  with wait {seconds, job_id}).
+
+EDITS, NOT REWRITES:
+- For localized changes prefer propose_edit/stage_edit (SEARCH/REPLACE hunks)
+  over propose_write/stage_write (whole file) — small models truncate or silently
+  drop content regenerating large files. Hunk mismatches fail cleanly.
 
 PRAGMATIC WRITE WORKFLOW:
-- Default write_mode is "propose": nothing reaches disk and commit_write
-  REFUSES — don't call it (its permission prompt would show only an opaque
-  op_id anyway). Review get_diff and apply the change with YOUR OWN edit tools
-  instead, so the user's native review UI shows the real diff. Best for
-  consequential changes.
-- For bulk mechanical batches (map_files over many files), propose mode forces
-  you to re-write every file — expensive. Instead: set_write_mode("write") for
-  the batch (it belongs in ask-permissions), review a SAMPLE of diffs with
-  get_diff, then commit_write each op. commit_write requires 'path' and
-  'summary' — that's all the user's approval prompt shows, so make the summary
-  say exactly what is being written. revert_write anything bad, then set the
-  mode back to "propose".
-- Long delegations: sync calls that outlast agent_sync_grace_ms return a job_id
-  (poll get_job) instead of losing the result; run_async:true skips the wait.
-  Steer with control_job — inject corrections mid-flight, pause, or cancel.
+- Default write_mode "propose": nothing reaches disk and commit_write REFUSES —
+  don't call it. Review get_diff and apply with YOUR OWN edit tools so the user's
+  native review UI shows the diff. Best for consequential changes.
+- Bulk batches (map_files over many files): set_write_mode("write") for the
+  batch, review a SAMPLE of diffs with get_diff, verify_staged the risky ones,
+  then commit_write each op. commit_write requires 'path' + 'summary' — that's
+  all the approval prompt shows, so make it say what is being written.
+  revert_write stages an undo; uncommit_write restores pre-commit content
+  directly. Set the mode back to "propose" when done.
+- Long delegations: sync calls past agent_sync_grace_ms return a job_id instead
+  of losing the result; run_async:true returns one immediately. Poll with
+  wait {seconds, job_id} (returns early on completion); steer with control_job —
+  inject corrections, pause, cancel.
 
 INPUT-SIZING:
 - Prefer \`paths\` (agent reads on demand) over \`files\` (inlined) for anything
-  large or numerous — the small model's context is small; context_warning will
-  tell you when you've blown it.
+  large or numerous — the small model's context is small; context_warning tells
+  you when you've blown it.
 - Pick model by fit: code transforms -> a coder model, general text -> instruct
   models. list_models + get_system_resources tell you what fits VRAM.
 
@@ -65,28 +76,24 @@ async function main(): Promise<void> {
   setRequestTimeout(ctx.config.limits.request_timeout_s * 1000);
   const loaded = loadPersistedDynamicTools();
 
-  const server = new McpServer(
-    { name: "local_llm", version: "0.1.0" },
-    {
-      instructions: INSTRUCTIONS,
-      capabilities: { tools: {}, prompts: {} },
-    },
-  );
-
-  registerCompletionTools(server, ctx);
-  registerFileTaskTools(server, ctx);
-  registerDelegateTools(server, ctx);
-  registerWriteTools(server, ctx);
-  registerManageTools(server, ctx);
-  registerDynamicToolTools(server, ctx);
-  registerWhitelistTools(server, ctx);
-  registerPrompts(server);
-
   // Root detection: cwd (the project dir Devin spawned us from) unless disabled.
   if (ctx.config.trust_cwd) ctx.guard.addRoot(process.cwd(), "cwd");
 
-  await server.connect(new StdioServerTransport());
-
+  await startServer({
+    name: "local_llm",
+    instructions: INSTRUCTIONS,
+    capabilities: { tools: {}, prompts: {} },
+    register: (server) => {
+      registerCompletionTools(server, ctx);
+      registerFileTaskTools(server, ctx);
+      registerDelegateTools(server, ctx);
+      registerWriteTools(server, ctx);
+      registerManageTools(server, ctx);
+      registerDynamicToolTools(server, ctx);
+      registerWhitelistTools(server, ctx);
+      registerPrompts(server);
+    },
+    afterConnect: async (server) => {
   // MCP roots capability: if the client advertises workspace roots, add them and
   // keep them in sync via roots/list_changed.
   const clientCaps = server.server.getClientCapabilities() as { roots?: unknown } | undefined;
@@ -117,6 +124,8 @@ async function main(): Promise<void> {
       `roots=[${ctx.guard.rootDetails.map((r) => `${r.path}(${r.source})`).join(", ")}] ` +
       `dynamic=${ctx.env.dynamicTools}(${loaded} loaded) run_command=${ctx.env.runCommand}`,
   );
+    },
+  });
 }
 
 main().catch((e) => {

@@ -119,7 +119,7 @@ In `~/.config/devin/config.json`:
 | `summarize` | Summarize files/globs server-side; only summaries return. |
 | `extract` | Structured JSON extraction, optional schema validation + retry. |
 | `classify` | Label text/files into candidate labels. |
-| `decide` | **Decision models** (ollama `/api/systemone` — `clef-flash`, `nimble`, `tev`). Scores 1–64 typed questions (`choice`/`score`/`noul`) about a state in one forward pass → calibrated probabilities per option. No generation, no parsing — prefer over `classify` when a decision model is installed. State comes from `state` text or files read server-side. Requires ollama ≥ the version with systemone support (check `ollama --version` — it's in main, post-0.35.1). |
+| `decide` | **Decision models** (ollama `/v1/systemone` — `clef-flash`, `nimble`, `tev`). Scores 1–64 typed questions (`choice`/`score`/`noul`) about a state in one forward pass → calibrated probabilities per option. No generation, no parsing — prefer over `classify` when a decision model is installed. State comes from `state` text or files read server-side. Needs ollama ≥0.40 (`clef-flash` is on the registry: `ollama pull clef-flash`). |
 | `map_files` | Apply one instruction across a glob — `report` results or `stage_writes` for review. |
 | `propose_write` | Local model rewrites/creates one file → staged diff. |
 | `propose_edit` | Patch-style edit: the model returns `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` hunks instead of the whole file; the server applies them to current content and stages the result. Cheaper + safer than `propose_write` for localized changes — a non-matching hunk is a clean error, not a truncated file. |
@@ -144,6 +144,21 @@ In `~/.config/devin/config.json`:
 | `get_usage_stats` / `get_server_info` | Session savings + effective config. |
 
 Slash commands (MCP prompts): `/mcp__local_llm__delegate <task> [files]` and `/mcp__local_llm__cheap_summary <path> [focus]`.
+
+## task_runner — a second server
+
+This repo also ships `task_runner` (`src/taskd.ts`, registered by `npm run configure` alongside `local_llm`) — a process manager for long-running background tasks: dev servers, build watchers, downloads, test loops.
+
+| Tool | What it does |
+|---|---|
+| `task_start` | Spawn a detached process (`argv`, no shell; optional `name`/`cwd`/`env`/`stdin`). Survives server restarts. stdout+stderr append to `<id>.log` in the state dir (`~/.local/state/taskd/`, override `TASKD_STATE_DIR`). |
+| `task_list` / `task_status` | All known tasks (reattached after restarts) / one task's status, pid, exit code, log path. |
+| `task_log` | Tail the task's combined log (`lines`, `max_bytes`). |
+| `task_stdin` | Write to a task's stdin (requires `stdin:true` at start; unavailable on reattached tasks). |
+| `task_kill` | Signal the whole process group — SIGTERM default, SIGKILL after `grace_ms`. |
+| `task_wait` | Return early when the task exits (up to `seconds`, max 600) — no busy polling. |
+
+Shared scaffolding (`src/lib/preflight.ts` dep-check + `src/lib/mcp.ts` server bootstrap) is what both servers are built on — add another by writing `src/<name>-server.ts` + a thin entry like `taskd.ts`.
 
 ## Generation params
 

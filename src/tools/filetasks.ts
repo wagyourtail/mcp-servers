@@ -254,7 +254,7 @@ export function registerFileTaskTools(server: McpServer, ctx: ServerContext): vo
     "decide",
     {
       description:
-        "Decision-model scoring (ollama /api/systemone — clef / clef-flash / nimble / tev). " +
+        "Decision-model scoring (ollama /v1/systemone — clef / clef-flash / nimble / tev). " +
         "Scores 1–64 TYPED questions about a state in ONE forward pass and returns calibrated " +
         "probabilities per option — no text generation, no output parsing, no retries. Prefer " +
         "over `classify` when a decision model is available: you get real probabilities instead " +

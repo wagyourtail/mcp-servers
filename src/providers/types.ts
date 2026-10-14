@@ -93,7 +93,7 @@ export interface PullProgress {
 }
 
 /**
- * System One / decision-model request (ollama `/api/systemone`). A decision
+ * System One / decision-model request (ollama `/v1/systemone`). A decision
  * model scores typed questions about a state in one pass — no text generation,
  * no output parsing. `criteria` shape depends on `type`: for "choice" it maps
  * option keys to descriptions (null uses the key itself).
@@ -143,7 +143,7 @@ export interface Provider {
   /** Delete a model's blobs (ollama /api/delete). Irreversible — re-pull to restore. */
   delete?(model: string): Promise<void>;
   show?(model: string): Promise<Record<string, unknown>>;
-  /** Decision-model scoring (ollama `/api/systemone`; clef/nimble/tev models). */
+  /** Decision-model scoring (ollama `/v1/systemone`; clef/nimble/tev models). */
   decide?(req: DecideRequest): Promise<DecideResult>;
 }
 

@@ -40,7 +40,7 @@ test("decide posts to /api/systemone with model, state, questions", async () => 
         lang: { type: "choice", instructions: "Which language?", criteria: { ts: null, py: null } },
       },
     });
-    assert.equal(seen!.url, "http://localhost:11434/api/systemone");
+    assert.equal(seen!.url, "http://localhost:11434/v1/systemone");
     assert.equal(seen!.body.model, "clef-flash:9b");
     assert.equal(seen!.body.state, "const x: number = 1;");
     assert.deepEqual((seen!.body.questions as Record<string, unknown>).lang, {

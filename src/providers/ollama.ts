@@ -244,7 +244,7 @@ export class OllamaProvider implements Provider {
       questions: req.questions,
     };
     if (this.cfg.keep_alive) body.keep_alive = this.cfg.keep_alive;
-    const res = await this.req("/api/systemone", {
+    const res = await this.req("/v1/systemone", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
