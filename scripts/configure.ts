@@ -4,6 +4,7 @@
  *   node scripts/configure.ts --yes      — accept all defaults, non-interactive
  *   node scripts/configure.ts --out PATH — write config elsewhere
  *   node scripts/configure.ts --clients devin,cursor — install into specific clients ('all'/'none')
+ *   node scripts/configure.ts --servers local_llm — install only some servers (default: all)
  *   node scripts/configure.ts --print-devin — only print the MCP registration JSON
  *   node scripts/configure.ts --no-install — don't offer to write client config files
  */
@@ -27,6 +28,7 @@ const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
 const outPath =
   outIdx >= 0 ? args[outIdx + 1] : process.env.LOCAL_LLM_CONFIG ?? join(xdg, "openai-mcp", "config.json");
 const clientsIdx = args.indexOf("--clients");
+const serversIdx = args.indexOf("--servers");
 
 // --- permissions -------------------------------------------------------------
 // Tool lists are NOT hardcoded here — `index.ts --manifest` runs each server's
@@ -36,9 +38,6 @@ const clientsIdx = args.indexOf("--clients");
 interface Manifest {
   [server: string]: { tools: string[]; ask: string[] };
 }
-
-/** Owns every `mcp__<server>__*` prefix we manage — used to scrub stale entries. */
-const OWNED_PERM = /^mcp__(local_llm|task_runner)__/;
 
 function loadManifest(): Manifest {
   try {
@@ -326,10 +325,35 @@ async function main(): Promise<void> {
     limits: { ...(existing.limits ?? {}), num_ctx: existing.limits?.num_ctx ?? 16384 },
   };
 
-  const servers = {
-    local_llm: serverEntry(env),
-    task_runner: taskdEntry(),
-  } as Record<string, McpEntry>;
+  // --- server selection (enumerated from `index.ts --manifest`) ---
+  const manifest = loadManifest();
+  const serverKeys = Object.keys(manifest);
+  let chosenServers: string[];
+  if (serversIdx >= 0) {
+    chosenServers = args[serversIdx + 1].split(",").map((s) => s.trim()).filter(Boolean);
+  } else if (!YES && !PRINT_ONLY && !NO_INSTALL) {
+    console.log(`\nServers: ${serverKeys.map((k) => `${k} (${manifest[k].tools.length} tools)`).join(", ")}`);
+    const raw = await ask(
+      "Install which servers? (comma-separated, 'all', or 'none')",
+      "all",
+    );
+    chosenServers = raw === "all" ? serverKeys : raw === "none" ? [] : raw.split(",").map((s) => s.trim());
+  } else {
+    chosenServers = serverKeys;
+  }
+  for (const s of chosenServers) {
+    if (!serverKeys.includes(s)) {
+      console.log(`  ! unknown server '${s}' — expected one of ${serverKeys.join(", ")}`);
+      chosenServers = chosenServers.filter((x) => x !== s);
+    }
+  }
+  const ALL_ENTRIES: Record<string, McpEntry> = {
+    local_llm: serverEntry(env) as McpEntry,
+    task_runner: taskdEntry() as McpEntry,
+  };
+  const servers = Object.fromEntries(
+    chosenServers.map((k) => [k, ALL_ENTRIES[k]]),
+  ) as Record<string, McpEntry>;
 
   if (PRINT_ONLY) {
     console.log("\n--- MCP registration (mcpServers envelope) ---");
@@ -397,12 +421,15 @@ async function main(): Promise<void> {
         true,
       )));
   if (mergePerms) {
-    const manifest = loadManifest();
-    const allow = Object.entries(manifest).flatMap(([srv, m]) =>
-      m.tools.filter((t) => !m.ask.includes(t)).map((t) => `mcp__${srv}__${t}`),
+    const selected = chosenServers.filter((s) => manifest[s]);
+    // Scrub only the selected servers' prefixes — an unselected server keeps
+    // whatever perms a previous run wrote (it may be managed elsewhere).
+    const ownedRe = new RegExp(`^mcp__(${selected.join("|")})__`);
+    const allow = selected.flatMap((srv) =>
+      manifest[srv].tools.filter((t) => !manifest[srv].ask.includes(t)).map((t) => `mcp__${srv}__${t}`),
     );
-    const askList = Object.entries(manifest).flatMap(([srv, m]) =>
-      m.ask.map((t) => `mcp__${srv}__${t}`),
+    const askList = selected.flatMap((srv) =>
+      manifest[srv].ask.map((t) => `mcp__${srv}__${t}`),
     );
     for (const client of permClients) {
       const cfg = readJson<{ permissions?: { allow?: string[]; ask?: string[] } } & Record<string, unknown>>(
@@ -413,7 +440,7 @@ async function main(): Promise<void> {
       // Scrub our entries first so tier demotions and removed tools propagate;
       // other servers' permissions are untouched.
       const rebuild = (cur: string[] | undefined, add: string[]): string[] => [
-        ...(cur ?? []).filter((t) => !OWNED_PERM.test(t)),
+        ...(cur ?? []).filter((t) => !ownedRe.test(t)),
         ...add,
       ];
       const before = {
@@ -435,7 +462,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ mcpServers: servers }, null, 2));
   }
   console.log(
-    `\nDone.${chosen.length ? ` Registered with: ${chosen.join(", ")}.` : ""} Restart the client(s) to pick up local_llm + task_runner.`,
+    `\nDone.${chosen.length ? ` Registered with: ${chosen.join(", ")}.` : ""} Restart the client(s) to pick up ${chosenServers.join(" + ") || "no servers"}.`,
   );
 }
 
