@@ -3,8 +3,9 @@
  *   node scripts/configure.ts            — wizard (prefills from existing config if present)
  *   node scripts/configure.ts --yes      — accept all defaults, non-interactive
  *   node scripts/configure.ts --out PATH — write config elsewhere
- *   node scripts/configure.ts --print-devin — only print the Devin MCP registration JSON
- *   node scripts/configure.ts --no-install — don't offer to write Devin config files
+ *   node scripts/configure.ts --clients devin,cursor — install into specific clients ('all'/'none')
+ *   node scripts/configure.ts --print-devin — only print the MCP registration JSON
+ *   node scripts/configure.ts --no-install — don't offer to write client config files
  */
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout, argv } from "node:process";
@@ -25,9 +26,7 @@ const outIdx = args.indexOf("--out");
 const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
 const outPath =
   outIdx >= 0 ? args[outIdx + 1] : process.env.LOCAL_LLM_CONFIG ?? join(xdg, "openai-mcp", "config.json");
-const devinDir = join(xdg, "devin");
-const devinMcpPath = join(devinDir, "mcp_config.json");
-const devinConfigPath = join(devinDir, "config.json");
+const clientsIdx = args.indexOf("--clients");
 
 const ALLOW_TOOLS = [
   "chat", "complete", "summarize", "extract", "classify", "map_files", "decide",
@@ -109,6 +108,99 @@ function serverEntry(env: Record<string, string>): object {
 
 function taskdEntry(): object {
   return { command: "node", args: [serverPath, "task_runner"] };
+}
+
+// --- MCP client targets -----------------------------------------------------
+// Every client stores server registrations as JSON; only the envelope differs.
+
+interface McpEntry {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+interface ClientSpec {
+  key: string;
+  label: string;
+  /** File holding this client's server registrations. */
+  path: string;
+  /** Insert our server entries into the file's parsed JSON doc. */
+  insert: (doc: Record<string, any>, servers: Record<string, McpEntry>) => void;
+  /** If the client has a tool-permission file with allow/ask lists, its path. */
+  permsPath?: string;
+}
+
+/** Shared mcpServers envelope: devin, claude-code, cursor, windsurf. */
+function mcpServersInsert(
+  doc: Record<string, any>,
+  servers: Record<string, McpEntry>,
+): void {
+  doc.mcpServers = { ...(doc.mcpServers ?? {}), ...servers };
+}
+
+const CLIENTS: ClientSpec[] = [
+  {
+    key: "devin",
+    label: "Devin",
+    path: join(xdg, "devin", "mcp_config.json"),
+    insert: mcpServersInsert,
+    permsPath: join(xdg, "devin", "config.json"),
+  },
+  {
+    key: "claude-code",
+    label: "Claude Code",
+    path: join(homedir(), ".claude.json"),
+    insert: mcpServersInsert,
+    // Same mcp__server__tool permission syntax as Devin.
+    permsPath: join(homedir(), ".claude", "settings.json"),
+  },
+  {
+    key: "cursor",
+    label: "Cursor",
+    path: join(homedir(), ".cursor", "mcp.json"),
+    insert: mcpServersInsert,
+  },
+  {
+    key: "windsurf",
+    label: "Windsurf",
+    path: join(homedir(), ".codeium", "windsurf", "mcp_config.json"),
+    insert: mcpServersInsert,
+  },
+  {
+    key: "vscode",
+    label: "VS Code",
+    path: join(xdg, "Code", "User", "settings.json"),
+    insert: (doc, servers) => {
+      doc.mcp = doc.mcp ?? {};
+      doc.mcp.servers = {
+        ...(doc.mcp.servers ?? {}),
+        ...Object.fromEntries(
+          Object.entries(servers).map(([k, v]) => [k, { type: "stdio", ...v }]),
+        ),
+      };
+    },
+  },
+  {
+    key: "zed",
+    label: "Zed",
+    path: join(xdg, "zed", "settings.json"),
+    insert: (doc, servers) => {
+      doc.context_servers = {
+        ...(doc.context_servers ?? {}),
+        ...Object.fromEntries(
+          Object.entries(servers).map(([k, v]) => [
+            k,
+            { command: { path: v.command, args: v.args }, settings: v.env ?? {} },
+          ]),
+        ),
+      };
+    },
+  },
+];
+
+function clientDetected(c: ClientSpec): boolean {
+  // The file, or its directory, existing means the client is plausibly installed.
+  return existsSync(c.path) || existsSync(dirname(c.path));
 }
 
 async function main(): Promise<void> {
@@ -213,15 +305,14 @@ async function main(): Promise<void> {
     limits: { ...(existing.limits ?? {}), num_ctx: existing.limits?.num_ctx ?? 16384 },
   };
 
+  const servers = {
+    local_llm: serverEntry(env),
+    task_runner: taskdEntry(),
+  } as Record<string, McpEntry>;
+
   if (PRINT_ONLY) {
-    console.log("\n--- Devin registration ---");
-    console.log(
-      JSON.stringify(
-        { mcpServers: { local_llm: serverEntry(env), task_runner: taskdEntry() } },
-        null,
-        2,
-      ),
-    );
+    console.log("\n--- MCP registration (mcpServers envelope) ---");
+    console.log(JSON.stringify({ mcpServers: servers }, null, 2));
     rl.close();
     return;
   }
@@ -229,52 +320,80 @@ async function main(): Promise<void> {
   writeJson(outPath, config);
   console.log(`\nWrote ${outPath}`);
 
-  // --- Devin install ---
-  const install = !NO_INSTALL && (YES || (await askBool(`Install into ${devinMcpPath}?`, true)));
-  if (install) {
-    const mcpCfg = readJson<{ mcpServers?: Record<string, unknown> }>(devinMcpPath, {});
-    mcpCfg.mcpServers = {
-      ...(mcpCfg.mcpServers ?? {}),
-      local_llm: serverEntry(env),
-      task_runner: taskdEntry(),
-    };
-    writeJson(devinMcpPath, mcpCfg);
-    console.log(`Wrote servers "local_llm" + "task_runner" -> ${devinMcpPath}`);
+  // --- client install ---
+  const detected = CLIENTS.filter(clientDetected).map((c) => c.key);
+  const allKeys = CLIENTS.map((c) => c.key);
+  const chosenRaw = clientsIdx >= 0
+    ? args[clientsIdx + 1]
+    : NO_INSTALL
+      ? "none"
+      : await ask(
+          `Install into which clients? (${allKeys.join("/")}, comma-separated, 'all', or 'none'; detected: ${detected.join(", ") || "none"})`,
+          "devin",
+        );
+  const chosen =
+    chosenRaw === "all"
+      ? allKeys
+      : chosenRaw === "none"
+        ? []
+        : chosenRaw
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+  for (const key of chosen) {
+    const client = CLIENTS.find((c) => c.key === key);
+    if (!client) {
+      console.log(`  ! unknown client '${key}' — expected one of ${allKeys.join(", ")}`);
+      continue;
+    }
+    const doc = readJson<Record<string, any>>(client.path, {});
+    client.insert(doc, servers);
+    writeJson(client.path, doc);
+    console.log(`Wrote servers -> ${client.path} (${client.label})`);
   }
 
-  const perms = !NO_INSTALL && (YES || (await askBool(`Merge recommended permissions into ${devinConfigPath}?`, true)));
-  if (perms) {
-    const cfg = readJson<{ permissions?: { allow?: string[]; ask?: string[]; deny?: string[] }; [k: string]: unknown }>(
-      devinConfigPath,
-      {},
-    );
-    cfg.permissions = cfg.permissions ?? {};
-    const merge = (cur: string[] | undefined, add: string[]): string[] => [...new Set([...(cur ?? []), ...add])];
-    const before = {
-      allow: (cfg.permissions.allow ?? []).length,
-      ask: (cfg.permissions.ask ?? []).length,
-    };
-    cfg.permissions.allow = merge(cfg.permissions.allow, [...ALLOW_TOOLS, ...TASK_ALLOW]);
-    cfg.permissions.ask = merge(cfg.permissions.ask, [...ASK_TOOLS, ...TASK_ASK]);
-    writeJson(devinConfigPath, cfg);
-    console.log(
-      `Permissions merged: allow ${before.allow} -> ${cfg.permissions.allow.length}, ask ${before.ask} -> ${cfg.permissions.ask.length}`,
-    );
+  // --- permissions (only clients that have allow/ask lists) ---
+  const permClients = chosen
+    .map((k) => CLIENTS.find((c) => c.key === k))
+    .filter((c): c is ClientSpec => !!c?.permsPath);
+  const mergePerms =
+    permClients.length > 0 &&
+    (YES ||
+      (await askBool(
+        `Merge recommended tool permissions (${permClients.map((c) => c!.label).join(", ")})?`,
+        true,
+      )));
+  if (mergePerms) {
+    for (const client of permClients) {
+      const cfg = readJson<{ permissions?: { allow?: string[]; ask?: string[] } } & Record<string, unknown>>(
+        client!.permsPath!,
+        {},
+      );
+      cfg.permissions = cfg.permissions ?? {};
+      const merge = (cur: string[] | undefined, add: string[]): string[] => [
+        ...new Set([...(cur ?? []), ...add]),
+      ];
+      const before = {
+        allow: (cfg.permissions.allow ?? []).length,
+        ask: (cfg.permissions.ask ?? []).length,
+      };
+      cfg.permissions.allow = merge(cfg.permissions.allow, [...ALLOW_TOOLS, ...TASK_ALLOW]);
+      cfg.permissions.ask = merge(cfg.permissions.ask, [...ASK_TOOLS, ...TASK_ASK]);
+      writeJson(client!.permsPath!, cfg);
+      console.log(
+        `Permissions merged (${client!.label}): allow ${before.allow} -> ${cfg.permissions.allow.length}, ask ${before.ask} -> ${cfg.permissions.ask.length}`,
+      );
+    }
   }
   rl.close();
 
-  if (!install) {
-    console.log("\n--- Devin registration (manual) ---");
-    console.log("Paste into ~/.config/devin/mcp_config.json:\n");
-    console.log(
-      JSON.stringify(
-        { mcpServers: { local_llm: serverEntry(env), task_runner: taskdEntry() } },
-        null,
-        2,
-      ),
-    );
+  if (!chosen.length) {
+    console.log("\n--- MCP registration (manual paste, mcpServers envelope) ---");
+    console.log(JSON.stringify({ mcpServers: servers }, null, 2));
   }
-  console.log("\nDone. New Devin sessions will pick up the local_llm + task_runner tools.");
+  console.log(
+    `\nDone.${chosen.length ? ` Registered with: ${chosen.join(", ")}.` : ""} Restart the client(s) to pick up local_llm + task_runner.`,
+  );
 }
 
 main().catch((e) => {

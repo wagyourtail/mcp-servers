@@ -44,9 +44,9 @@ MCP client advertises (the spec's `roots` capability) ∪ the directory Devin sp
 project, and `allowed_roots` is for *extra* directories outside it. `deny_globs` blocks secrets
 everywhere. `get_server_info` shows each root with its source.
 
-### 2. Register with Devin
+### 2. Register with your MCP client
 
-*`npm run configure` does this for you — shown here for manual setup.*
+*`npm run configure` does this for you — it detects and offers Devin, Claude Code, Cursor, Windsurf, VS Code, and Zed (`--clients devin,cursor`, `all`, or `none`). Shown here for manual setup — the `mcpServers` envelope works in Devin, Claude Code, Cursor, and Windsurf as-is.*
 
 **Devin settings → MCP → Add custom MCP** (or edit `~/.config/devin/mcp_config.json`):
 
@@ -74,6 +74,8 @@ thinking-capable models can eat the whole `max_tokens` budget.
 CLI equivalent: `devin mcp add -s user local_llm -- node /path/to/openai-mcp/src/index.ts`
 
 Omit the two `LOCAL_LLM_*` env flags to disable shell access and dynamic tools entirely.
+
+Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/path/to/openai-mcp/src/index.ts", "task_runner"]}`. VS Code uses `mcp.servers` in user settings (`"type": "stdio"` on each entry); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`.
 
 ### 3. Recommended Devin permissions
 
