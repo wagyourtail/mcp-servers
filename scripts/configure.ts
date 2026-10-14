@@ -341,6 +341,7 @@ async function main(): Promise<void> {
 
   // --- client install ---
   const allKeys = CLIENTS.map((c) => c.key);
+  const detected = CLIENTS.filter(clientDetected).map((c) => c.key);
   let chosenRaw: string;
   if (clientsIdx >= 0) {
     chosenRaw = args[clientsIdx + 1];
@@ -348,22 +349,22 @@ async function main(): Promise<void> {
     chosenRaw = "none";
   } else {
     console.log("\nMCP clients:");
-    const detected: string[] = [];
     for (const c of CLIENTS) {
-      const found = clientDetected(c);
-      if (found) detected.push(c.key);
+      const found = detected.includes(c.key);
       console.log(
         `  ${found ? "●" : "○"} ${c.key.padEnd(18)} ${c.label}${found ? ` — ${c.path}` : " (not detected)"}`,
       );
     }
     chosenRaw = await ask(
-      `Install into which clients? (comma-separated keys, 'all', or 'none')`,
-      detected.join(",") || "devin",
+      `Install into which clients? (comma-separated keys, 'all' = detected, or 'none')`,
+      "all",
     );
   }
   const chosen =
     chosenRaw === "all"
-      ? allKeys
+      ? clientsIdx >= 0
+        ? allKeys // --clients all is explicit — every known client
+        : detected // interactive 'all' — detected only; undetected needs its key
       : chosenRaw === "none"
         ? []
         : chosenRaw
