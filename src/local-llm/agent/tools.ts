@@ -1,7 +1,7 @@
 import { stripFences } from "../tools/helpers.ts";
 import type { AgentTool } from "./loop.ts";
 import type { FsGuard } from "../lib/fs-guard.ts";
-import { stageWrite } from "../lib/staging.ts";
+import { stageDelete, stageWrite } from "../lib/staging.ts";
 import { checkCommand, runWhitelisted, type CommandWhitelist } from "../lib/whitelist.ts";
 import { verifyStagedOp } from "../lib/verify.ts";
 import { searchFiles } from "../lib/filesearch.ts";
@@ -147,6 +147,29 @@ export function buildAgentTools(deps: AgentToolDeps): AgentTool[] {
         );
         return `staged op ${op.id} (edit ${op.path}, ${res.applied} hunk${res.applied === 1 ? "" : "s"}` +
           `${res.fuzzy.length ? ` — hunk(s) ${res.fuzzy.join(",")} matched loosely` : ""}). Pending review — do NOT assume it is on disk.`;
+      },
+    },
+    {
+      spec: {
+        name: "stage_delete",
+        description:
+          "Stage a file DELETION for review — the file is NOT removed until a human/agent commits " +
+          "the op. Use for removing dead files; for edits use stage_edit instead.",
+        parameters: OBJ(
+          {
+            path: { type: "string", description: "Existing file to delete" },
+            reason: { type: "string", description: "One-line rationale" },
+          },
+          ["path"],
+        ),
+      },
+      async execute(args) {
+        const op = stageDelete(
+          guard,
+          { path: String(args.path), source: "local_agent", reviewNote: args.reason ? String(args.reason) : undefined },
+          deps.stageTtlMs,
+        );
+        return `staged delete op ${op.id} (${op.path}). Pending review — the file is NOT deleted yet.`;
       },
     },
   ];

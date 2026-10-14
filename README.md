@@ -110,9 +110,12 @@ registry-managed tasks.
 | `classify` | Label text/files into candidate labels. |
 | `decide` | **Decision models** (ollama `/v1/systemone` — `clef-flash`, `nimble`, `tev`). Scores 1–64 typed questions (`choice`/`score`/`noul`) about a state in one forward pass → calibrated probabilities per option. No generation, no parsing — prefer over `classify` when a decision model is installed. State comes from `state` text or files read server-side. Needs ollama ≥0.40 (`clef-flash` is on the registry: `ollama pull clef-flash`). |
 | `map_files` | Apply one instruction across a glob — `report` results or `stage_writes` for review. |
+| `embed` | Text embeddings for text/files (`text`/`path`/`paths`/`glob`) — semantic dedup, clustering, find-similar. Needs an embedding model (`nomic-embed-text`, `embeddinggemma`). Returns raw vectors. |
+| `count_tokens` | chars/4 token estimate for text/files — size inputs against `num_ctx` before delegating. |
 | `propose_write` | Local model rewrites/creates one file → staged diff. |
 | `propose_edit` | Patch-style edit: the model returns `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` hunks instead of the whole file; the server applies them to current content and stages the result. Cheaper + safer than `propose_write` for localized changes — a non-matching hunk is a clean error, not a truncated file. |
-| `list_staged` / `get_diff` / `commit_write` / `discard_write` | Staged-write lifecycle. **Nothing the local model writes reaches disk without `commit_write`.** Commit refuses if the file drifted since staging (`force=true` overrides) — and entirely while `write_mode` is `propose`. `commit_write` requires `path` + `summary` args so the approval prompt shows *what* is being written, not just an opaque op id; the `path` is verified against the staged op. |
+| `stage_delete` | Stage a file deletion — diff shows all lines removed, `commit_write` unlinks, `uncommit_write` restores. The local agent gets this too. |
+| `list_staged` / `get_diff` / `commit_write` / `discard_write` | Staged-write lifecycle. **Nothing the local model writes reaches disk without `commit_write`.** Commit refuses if the file drifted since staging (`force=true` overrides) — and entirely while `write_mode` is `propose`. `commit_write` requires `path` + `summary` args so the approval prompt shows *what* is being written, not just an opaque op id; the `path` is verified against the staged op. `ops:[{op_id,path,summary}]` commits a batch in one approval. |
 | `set_write_mode` | `propose` (default): server stages diffs only; Devin applies via its own edit tools (`get_diff include_content` for full content). `write`: `commit_write` writes to disk. `persist:true` saves to config. |
 | `verify_staged` | Lint/typecheck a staged op **without touching the real file**: content is materialized to a temp file in the same directory (imports resolve), `{file}` in argv substitutes the temp path, runs under the command whitelist, then cleans up. `restore_paths` snapshots/restores side files the checker may rewrite. The local agent gets this too — `run_command` on the real path only sees old disk content. |
 | `list_commits` / `revert_write` / `uncommit_write` | Undo: `revert_write(commit_id)` stages a revert op (reviewed path); `uncommit_write(commit_id)` restores pre-commit content immediately in `write` mode (deletes files the commit created; drift-checked). |
@@ -145,7 +148,10 @@ This repo also ships `task_runner` (registered by `npm run configure` alongside 
 | `task_log` | Tail the task's combined log (`lines`, `max_bytes`). |
 | `task_stdin` | Write to a task's stdin (requires `stdin:true` at start; unavailable on reattached tasks). |
 | `task_kill` | Signal the whole process group — SIGTERM default, SIGKILL after `grace_ms`. |
-| `task_wait` | Return early when the task exits (up to `seconds`, max 600) — no busy polling. |
+| `task_restart` | Kill + respawn with the recorded argv/cwd/env — same id and log. Ask-tier like `task_start` (it launches a process). |
+| `task_wait` | Return early when the task exits (up to `seconds`, max 600) — no busy polling. `match:"regex"` also returns early when a log line matches (e.g. `listening on :\d+`). |
+
+Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF).
 
 Both servers launch through one entry: `node src/index.ts` (defaults to `local_llm`) or `node src/index.ts task_runner`. Server code lives in `src/local-llm/` and `src/task-runner/`; `src/shared/` (`preflight.ts` dep-check + `mcp.ts` bootstrap) is the common kit — add another server by writing `src/<name>/server.ts` and one line in `index.ts`'s `SERVERS` map.
 

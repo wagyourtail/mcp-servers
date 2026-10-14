@@ -23,6 +23,10 @@ export interface TaskMeta {
   name?: string;
   argv: string[];
   cwd: string;
+  /** Extra env vars recorded so task_restart can replay the spec. */
+  env?: Record<string, string>;
+  /** Whether the task was started with a stdin pipe (restart replays it). */
+  stdin?: boolean;
   pid: number;
   logPath: string;
   startedAt: string;
@@ -54,7 +58,43 @@ export interface TaskLogResult {
   tail: string;
 }
 
+export interface TaskWaitResult {
+  task: TaskMeta;
+  /** Present when `match` was given: whether the regex ever appeared. */
+  matched?: boolean;
+  matchedLine?: string;
+}
+
 const DEFAULT_TAIL = 200;
+/** Logs are append-only and unbounded — prune to the tail past this size. */
+const MAX_LOG_BYTES = 64 * 1024 * 1024;
+const KEEP_LOG_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Truncate a log to its last KEEP_LOG_BYTES once it passes MAX_LOG_BYTES.
+ * Safe against concurrent writers: children hold the fd O_APPEND, so each of
+ * their writes re-seeks to the (new) EOF — no holes.
+ */
+function pruneLog(path: string): void {
+  try {
+    const size = statSync(path).size;
+    if (size <= MAX_LOG_BYTES) return;
+    const fd = openSync(path, "r");
+    let tail: Buffer;
+    try {
+      tail = Buffer.alloc(KEEP_LOG_BYTES);
+      readAt(fd, tail, size - KEEP_LOG_BYTES);
+    } finally {
+      closeFd(fd);
+    }
+    writeFileSync(
+      path,
+      `[taskd: pruned ${size - KEEP_LOG_BYTES} bytes of old log]\n` + tail.toString("utf-8"),
+    );
+  } catch {
+    /* best effort */
+  }
+}
 
 export class TaskRegistry {
   private tasks = new Map<string, LiveTask>();
@@ -113,32 +153,20 @@ export class TaskRegistry {
     this.persist();
   }
 
-  start(opts: TaskStartOptions): TaskMeta {
-    if (!opts.argv.length || !opts.argv[0]) throw new Error("argv must be a non-empty array");
-    const id = randomBytes(6).toString("hex");
-    const logPath = join(this.stateDir, `${id}.log`);
-    const fd = openSync(logPath, "a");
-    const cwd = opts.cwd ? resolve(opts.cwd) : process.cwd();
+  /** Spawn the child for task.meta and wire exit bookkeeping. */
+  private spawnFor(task: LiveTask): void {
+    const { meta } = task;
+    const fd = openSync(meta.logPath, "a");
     // detached: child is a process-group leader, survives server restart, and
     // kill(-pid) reaps the whole group (children of the task included).
-    const proc = spawn(opts.argv[0], opts.argv.slice(1), {
-      cwd,
-      env: { ...process.env, ...(opts.env ?? {}) },
+    const proc = spawn(meta.argv[0], meta.argv.slice(1), {
+      cwd: meta.cwd,
+      env: { ...process.env, ...(meta.env ?? {}) },
       detached: true,
-      stdio: [opts.stdin ? "pipe" : "ignore", fd, fd],
+      stdio: [meta.stdin ? "pipe" : "ignore", fd, fd],
     });
-    const meta: TaskMeta = {
-      id,
-      name: opts.name,
-      argv: opts.argv,
-      cwd,
-      pid: proc.pid!,
-      logPath,
-      startedAt: new Date().toISOString(),
-      status: "running",
-    };
-    const task: LiveTask = { meta, proc };
-    this.tasks.set(id, task);
+    meta.pid = proc.pid!;
+    task.proc = proc;
     proc.on("exit", (code, signal) => {
       this.update(meta, {
         status: signal ? "killed" : "exited",
@@ -152,9 +180,51 @@ export class TaskRegistry {
         status: "exited",
         finishedAt: new Date().toISOString(),
       });
-      appendLog(logPath, `[taskd spawn error: ${e.message}]\n`);
+      appendLog(meta.logPath, `[taskd spawn error: ${e.message}]\n`);
     });
     proc.unref();
+  }
+
+  start(opts: TaskStartOptions): TaskMeta {
+    if (!opts.argv.length || !opts.argv[0]) throw new Error("argv must be a non-empty array");
+    const id = randomBytes(6).toString("hex");
+    const meta: TaskMeta = {
+      id,
+      name: opts.name,
+      argv: opts.argv,
+      cwd: opts.cwd ? resolve(opts.cwd) : process.cwd(),
+      env: opts.env,
+      stdin: opts.stdin,
+      pid: 0,
+      logPath: join(this.stateDir, `${id}.log`),
+      startedAt: new Date().toISOString(),
+      status: "running",
+    };
+    const task: LiveTask = { meta };
+    this.tasks.set(id, task);
+    this.spawnFor(task);
+    this.persist();
+    return meta;
+  }
+
+  /**
+   * Kill (if running) and respawn with the recorded argv/cwd/env/stdin — same
+   * task id and log file (a restart marker is appended to the log).
+   */
+  async restart(id: string, graceMs = 3000): Promise<TaskMeta> {
+    const task = this.tasks.get(id);
+    if (!task) throw new Error(`no task ${id}`);
+    await this.kill(id, "SIGTERM", graceMs);
+    const { meta } = task;
+    appendLog(meta.logPath, `\n[taskd restart ${new Date().toISOString()}]\n`);
+    this.update(meta, {
+      status: "running",
+      exitCode: undefined,
+      exitSignal: undefined,
+      finishedAt: undefined,
+      startedAt: new Date().toISOString(),
+    });
+    this.spawnFor(task);
     this.persist();
     return meta;
   }
@@ -174,6 +244,7 @@ export class TaskRegistry {
     const meta = this.get(id);
     if (!meta) throw new Error(`no task ${id}`);
     if (!existsSync(meta.logPath)) return { path: meta.logPath, bytes: 0, truncated: false, tail: "" };
+    pruneLog(meta.logPath);
     const size = statSync(meta.logPath).size;
     const fd = openSync(meta.logPath, "r");
     try {
@@ -209,19 +280,44 @@ export class TaskRegistry {
     return meta;
   }
 
-  /** Resolve when the task leaves `running` or `seconds` elapse. */
-  async wait(id: string, seconds: number): Promise<TaskMeta> {
+  /**
+   * Resolve when the task leaves `running`, `seconds` elapse, or (with `match`)
+   * a line matching the regex appears in the log — whichever first. A final
+   * scan runs after exit so output flushed just before death still matches.
+   */
+  async wait(id: string, seconds: number, match?: string): Promise<TaskWaitResult> {
     const task = this.tasks.get(id);
     if (!task) throw new Error(`no task ${id}`);
     const { meta } = task;
-    if (meta.status === "running") {
-      await waitFor(() => meta.status !== "running" || !pidAlive(meta.pid), seconds * 1000);
-      // Reattached tasks have no exit event — reconcile from pid liveness.
-      if (meta.status === "running" && !pidAlive(meta.pid)) {
-        this.update(meta, { status: "exited", finishedAt: new Date().toISOString() });
+    const re = match !== undefined ? new RegExp(match) : undefined;
+    let hit: string | undefined;
+    const scan = (): boolean => {
+      if (!re) return false;
+      try {
+        const { tail } = this.log(id, 2000, 512 * 1024);
+        const line = tail.split("\n").find((l) => re.test(l));
+        if (line !== undefined) {
+          hit = line;
+          return true;
+        }
+      } catch {
+        /* log may not exist yet */
       }
+      return false;
+    };
+    const deadline = Date.now() + seconds * 1000;
+    while (Date.now() < deadline) {
+      if (scan()) break;
+      pruneLog(meta.logPath);
+      if (meta.status !== "running" || !pidAlive(meta.pid)) break;
+      await new Promise((r) => setTimeout(r, 200));
     }
-    return meta;
+    if (hit === undefined && re) scan(); // final scan post-exit/timeout
+    // Reattached tasks have no exit event — reconcile from pid liveness.
+    if (meta.status === "running" && !pidAlive(meta.pid)) {
+      this.update(meta, { status: "exited", finishedAt: new Date().toISOString() });
+    }
+    return { task: meta, ...(re ? { matched: hit !== undefined, matchedLine: hit } : {}) };
   }
 
   /** Write to a task's stdin. Only works while this server process spawned it. */

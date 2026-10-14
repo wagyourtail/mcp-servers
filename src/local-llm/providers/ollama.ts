@@ -264,4 +264,16 @@ export class OllamaProvider implements Provider {
       },
     };
   }
+
+  async embed(model: string, input: string[]): Promise<number[][]> {
+    const body: Record<string, unknown> = { model, input };
+    if (this.cfg.keep_alive) body.keep_alive = this.cfg.keep_alive;
+    const res = await this.req("/api/embed", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json()) as { embeddings?: number[][] };
+    return data.embeddings ?? [];
+  }
 }

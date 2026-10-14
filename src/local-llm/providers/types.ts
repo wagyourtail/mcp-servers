@@ -145,6 +145,8 @@ export interface Provider {
   show?(model: string): Promise<Record<string, unknown>>;
   /** Decision-model scoring (ollama `/v1/systemone`; clef/nimble/tev models). */
   decide?(req: DecideRequest): Promise<DecideResult>;
+  /** Text embeddings for a batch of inputs (ollama `/api/embed`, openai `/v1/embeddings`). */
+  embed?(model: string, input: string[]): Promise<number[][]>;
 }
 
 export function isLocalUrl(baseUrl: string): boolean {

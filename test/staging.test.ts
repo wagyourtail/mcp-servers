@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FsGuard } from "../src/local-llm/lib/fs-guard.ts";
-import { stageWrite, getOp, listOps, commitOp, discardOp, listCommits, revertCommit, uncommitOp } from "../src/local-llm/lib/staging.ts";
+import { stageWrite, stageDelete, getOp, listOps, commitOp, discardOp, listCommits, revertCommit, uncommitOp } from "../src/local-llm/lib/staging.ts";
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "staging-"));
@@ -147,4 +147,27 @@ test("revert stages an op restoring pre-commit content", async () => {
   assert.equal(revert.newContent, "line1\nline2\n");
   await commitOp(guard, revert.id);
   assert.equal(readFileSync(join(root, "a.txt"), "utf-8"), "line1\nline2\n");
+});
+
+test("stage_delete: commit removes file, uncommit restores content", async () => {
+  const { root, guard } = setup();
+  writeFileSync(join(root, "dead.txt"), "dead code\n");
+  const op = stageDelete(guard, { path: join(root, "dead.txt") }, 60_000);
+  assert.equal(op.kind, "delete");
+  assert.match(op.diff, /dead code/);
+  assert.ok(existsSync(join(root, "dead.txt")), "staging must not delete");
+  const { commitId } = await commitOp(guard, op.id);
+  assert.ok(!existsSync(join(root, "dead.txt")));
+  const r = await uncommitOp(guard, commitId);
+  assert.equal(readFileSync(join(root, "dead.txt"), "utf-8"), "dead code\n");
+  assert.equal(r.deleted, false);
+});
+
+test("stage_delete refuses a missing file and detects drift", async () => {
+  const { root, guard } = setup();
+  assert.throws(() => stageDelete(guard, { path: join(root, "nope.txt") }, 60_000), /does not exist/);
+  writeFileSync(join(root, "drift.txt"), "v1\n");
+  const op = stageDelete(guard, { path: join(root, "drift.txt") }, 60_000);
+  writeFileSync(join(root, "drift.txt"), "v2\n");
+  await assert.rejects(() => commitOp(guard, op.id), /changed since staging/);
 });

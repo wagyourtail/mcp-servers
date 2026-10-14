@@ -19,7 +19,7 @@ test("start runs detached, captures stdout/stderr to log", async () => {
     assert.equal(t.status, "running");
     assert.ok(t.pid > 0);
     assert.ok(t.logPath.endsWith(`${t.id}.log`));
-    const done = await tasks.wait(t.id, 10);
+    const { task: done } = await tasks.wait(t.id, 10);
     assert.equal(done.status, "exited");
     assert.equal(done.exitCode, 0);
     const log = tasks.log(t.id);
@@ -49,12 +49,12 @@ test("wait returns early on exit, times out on a sleeper", async () => {
   try {
     const quick = tasks.start({ argv: [NODE, "-e", "setTimeout(()=>{},300)"] });
     const t0 = Date.now();
-    const done = await tasks.wait(quick.id, 10);
+    const { task: done } = await tasks.wait(quick.id, 10);
     assert.equal(done.status, "exited");
     assert.ok(Date.now() - t0 < 5000, "should return early");
 
     const slow = tasks.start({ argv: [NODE, "-e", "setInterval(()=>{},1000)"] });
-    const timed = await tasks.wait(slow.id, 1);
+    const { task: timed } = await tasks.wait(slow.id, 1);
     assert.equal(timed.status, "running");
     await tasks.kill(slow.id, "SIGKILL", 0);
   } finally {
@@ -123,6 +123,64 @@ test("stdin rejected when not enabled", async () => {
     const t = tasks.start({ argv: [NODE, "-e", "setInterval(()=>{},1000)"] });
     assert.throws(() => tasks.stdin(t.id, "x"), /stdin/);
     await tasks.kill(t.id, "SIGKILL", 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("wait(match) returns early when a log line matches", async () => {
+  const { dir, tasks } = setup();
+  try {
+    const t = tasks.start({
+      argv: [NODE, "-e", "setTimeout(()=>console.log('listening on :3000'),300); setInterval(()=>{},1000)"],
+    });
+    const t0 = Date.now();
+    const r = await tasks.wait(t.id, 10, "listening on :\\d+");
+    assert.equal(r.matched, true);
+    assert.match(r.matchedLine!, /listening on :3000/);
+    assert.ok(Date.now() - t0 < 5000, "should return before timeout");
+    assert.equal(r.task.status, "running");
+    await tasks.kill(t.id, "SIGKILL", 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("wait(match) returns matched:false when task exits without matching", async () => {
+  const { dir, tasks } = setup();
+  try {
+    const t = tasks.start({ argv: [NODE, "-e", "console.log('nope')"] });
+    const r = await tasks.wait(t.id, 10, "never-appears");
+    assert.equal(r.matched, false);
+    assert.equal(r.task.status, "exited");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("restart respawns with the same id, argv and log", async () => {
+  const { dir, tasks } = setup();
+  try {
+    const t = tasks.start({
+      argv: [NODE, "-e", "console.log('gen ' + process.env.GEN); setInterval(()=>{},1000)"],
+      env: { GEN: "1" },
+    });
+    await tasks.wait(t.id, 5, "gen 1"); // let gen-1 print before restarting
+    const r = await tasks.restart(t.id);
+    assert.equal(r.id, t.id);
+    assert.equal(r.status, "running");
+    assert.equal(r.logPath, t.logPath);
+    // NB: the OS may reuse the pid — verify the respawn via the log instead.
+    const deadline = Date.now() + 5000;
+    let log = tasks.log(t.id);
+    while (Date.now() < deadline && (log.tail.match(/gen 1/g) ?? []).length < 2) {
+      await new Promise((res) => setTimeout(res, 200));
+      log = tasks.log(t.id);
+    }
+    await tasks.kill(t.id, "SIGKILL", 0);
+    log = tasks.log(t.id);
+    assert.equal((log.tail.match(/gen 1/g) ?? []).length, 2, "both generations logged");
+    assert.match(log.tail, /taskd restart/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

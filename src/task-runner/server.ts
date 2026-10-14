@@ -15,7 +15,10 @@ WHEN TO USE:
 - Stopping: task_kill signals the whole process group (SIGTERM, SIGKILL after a
   grace period). task_stdin feeds interactive tasks started with stdin:true.
 - Waiting: task_wait {id, seconds} returns early when the task exits — use it
-  instead of sleep-polling task_status.
+  instead of sleep-polling task_status. 'match' (a regex) also returns early
+  when a log line matches (e.g. 'listening on :[0-9]+' for a dev server).
+- Restarting: task_restart {id} kills + respawns with the recorded argv/cwd/env —
+  same id and log. Logs are bounded (pruned past 64MB).
 
 Semantics:
 - argv only, no shell — no pipes/redirects/globs. Wrap in ['sh','-c',...] if you

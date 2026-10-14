@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { pickModel } from "../context.ts";
 import { GEN_PARAMS, jsonResult, makeProgress, stripFences, trackedChat, type ProgressExtra } from "./helpers.ts";
-import { commitOp, discardOp, getOp, listCommits, listOps, revertCommit, stageWrite, uncommitOp } from "../lib/staging.ts";
+import { commitOp, discardOp, getOp, listCommits, listOps, revertCommit, stageDelete, stageWrite, uncommitOp } from "../lib/staging.ts";
 import { applyEdits, parseEditBlocks, type ApplyResult } from "../lib/edits.ts";
 import { verifyStagedOp } from "../lib/verify.ts";
 import { patchConfig } from "../config.ts";
@@ -143,6 +143,36 @@ export function registerWriteTools(reg: Registrar, ctx: ServerContext): void {
   );
 
   reg.allow(
+    "stage_delete",
+    {
+      description:
+        "Stage a file DELETION for review — nothing touches disk until commit_write. " +
+        "The diff shows all lines removed; uncommit_write restores the file afterwards. " +
+        "Use for dead-code cleanup instead of emptying a file with propose_write.",
+      inputSchema: {
+        path: z.string().describe("Existing file to delete (must be inside allowed roots)"),
+        reason: z.string().optional().describe("One-line rationale shown in review"),
+      },
+    },
+    async ({ path, reason }) => {
+      const op = stageDelete(
+        ctx.guard,
+        { path, source: "stage_delete", reviewNote: reason },
+        ctx.config.limits.stage_ttl_s * 1000,
+      );
+      return jsonResult({
+        op_id: op.id,
+        path: op.path,
+        kind: "delete",
+        diff: op.diff,
+        note: ctx.writeMode === "write"
+          ? "Review the diff, then commit_write(op_id) or discard_write(op_id)."
+          : "Staged only (write_mode=propose): apply the deletion with your own tools, or discard_write(op_id).",
+      });
+    },
+  );
+
+  reg.allow(
     "list_staged",
     {
       description: "List pending staged writes (proposed changes not yet on disk).",
@@ -208,20 +238,35 @@ export function registerWriteTools(reg: Registrar, ctx: ServerContext): void {
         "get_diff. Refuses if the file changed since it was staged — pass force=true to overwrite anyway. " +
         "Only works when write_mode is 'write' — do NOT call it in 'propose' mode (it refuses and the " +
         "permission prompt would just show an opaque op_id). `path` and `summary` are REQUIRED because " +
-        "the user's approval prompt only shows tool args — make them say exactly what is being written.",
+        "the user's approval prompt only shows tool args — make them say exactly what is being written. " +
+        "Pass `ops: [{op_id, path, summary}]` instead to commit a batch in ONE approval — use it for " +
+        "map_files stage_writes output so the user sees the whole set at once.",
       inputSchema: {
-        op_id: z.string(),
+        op_id: z.string().optional(),
         path: z
           .string()
-          .describe("REQUIRED: the file this op writes — verified against the staged op so the approval prompt can't lie about the target."),
+          .optional()
+          .describe("REQUIRED for single-op: the file this op writes — verified against the staged op so the approval prompt can't lie about the target."),
         summary: z
           .string()
           .min(1)
-          .describe("REQUIRED: one-line description of the change, e.g. 'sort list items alphabetically' — the main thing the user sees when approving."),
+          .optional()
+          .describe("REQUIRED for single-op: one-line description of the change — the main thing the user sees when approving."),
+        ops: z
+          .array(
+            z.object({
+              op_id: z.string(),
+              path: z.string(),
+              summary: z.string().min(1),
+            }),
+          )
+          .max(50)
+          .optional()
+          .describe("Batch commit: [{op_id, path, summary}] — one approval prompt shows the whole set"),
         force: z.boolean().optional().describe("Commit even if the file changed since staging"),
       },
     },
-    async ({ op_id, path, summary, force }) => {
+    async ({ op_id, path, summary, ops: batch, force }) => {
       if (ctx.writeMode !== "write") {
         throw new Error(
           "write_mode is 'propose' — the server won't write to disk. Apply the staged diff with your own " +
@@ -229,18 +274,31 @@ export function registerWriteTools(reg: Registrar, ctx: ServerContext): void {
             "set_write_mode('write') to enable server-side commits.",
         );
       }
-      const op = getOp(op_id);
-      if (!op) throw new Error(`no staged op with id ${op_id} (expired or never existed)`);
-      const claimed = ctx.guard.resolve(path);
-      if (claimed !== op.path) {
-        throw new Error(`path mismatch: op ${op_id} writes ${op.path}, not ${claimed}`);
+      const items =
+        batch ??
+        (op_id
+          ? [{ op_id, path: path!, summary: summary! }]
+          : undefined);
+      if (!items?.length) throw new Error("commit_write requires `op_id`+`path`+`summary` or `ops`");
+      for (const it of items) {
+        if (!it.path || !it.summary) {
+          throw new Error(`op ${it.op_id}: 'path' and 'summary' are required — they are what the approval prompt shows`);
+        }
       }
-      const r = await commitOp(ctx.guard, op_id, force ?? false, summary);
+      const committed: { op_id: string; path: string; commit_id: string; drifted: boolean }[] = [];
+      // Sequential + stop at first failure: partial state is reported honestly.
+      for (const it of items) {
+        const op = getOp(it.op_id);
+        if (!op) throw new Error(`no staged op with id ${it.op_id} (expired or never existed)`);
+        const claimed = ctx.guard.resolve(it.path);
+        if (claimed !== op.path) {
+          throw new Error(`path mismatch: op ${it.op_id} writes ${op.path}, not ${claimed}`);
+        }
+        const r = await commitOp(ctx.guard, it.op_id, force ?? false, it.summary);
+        committed.push({ op_id: it.op_id, path: r.path, commit_id: r.commitId, drifted: r.drifted });
+      }
       return jsonResult({
-        committed: r.path,
-        bytes: r.bytes,
-        commit_id: r.commitId,
-        drifted: r.drifted,
+        committed,
         note: "Undo available via revert_write(commit_id) — creates a staged revert op.",
       });
     },

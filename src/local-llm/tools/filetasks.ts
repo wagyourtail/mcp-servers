@@ -401,4 +401,54 @@ export function registerFileTaskTools(reg: Registrar, ctx: ServerContext): void 
       });
     },
   );
+
+  reg.allow(
+    "embed",
+    {
+      description:
+        "Embed text/files with an embedding model on the local provider — for semantic dedup, " +
+        "clustering, or find-similar work that generation can't do. Needs an embedding model " +
+        "(e.g. `nomic-embed-text`, `embeddinggemma`) — check list_models capabilities. Returns " +
+        "raw vectors; cosine-similarity them yourself.",
+      inputSchema: { ...INPUT, model: COMMON.model, provider: COMMON.provider },
+    },
+    async (input) => {
+      const sources = await collectSources(ctx, input);
+      const { provider, model: m } = pickModel(ctx, input.provider, input.model);
+      if (!provider.embed) {
+        throw new Error(`provider '${provider.name}' (${provider.type}) has no embeddings endpoint`);
+      }
+      const vectors = await provider.embed(m, sources.map((s) => s.content));
+      return jsonResult({
+        model: m,
+        count: vectors.length,
+        dims: vectors[0]?.length ?? 0,
+        labels: sources.map((s) => s.label),
+        embeddings: vectors,
+      });
+    },
+  );
+
+  reg.allow(
+    "count_tokens",
+    {
+      description:
+        "Estimate token counts for text/files (chars/4 heuristic — ±20% vs a real tokenizer; " +
+        "for input sizing, not billing). Use before run_local_agent/summarize to check fit vs num_ctx.",
+      inputSchema: INPUT,
+    },
+    async (input) => {
+      const sources = await collectSources(ctx, input);
+      const per = sources.map((s) => ({
+        label: s.label,
+        bytes: s.bytes,
+        tokens: Math.ceil(s.bytes / 4),
+      }));
+      return jsonResult({
+        sources: per,
+        total_tokens: per.reduce((a, s) => a + s.tokens, 0),
+        note: "chars/4 heuristic — use for input sizing only.",
+      });
+    },
+  );
 }

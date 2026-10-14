@@ -43,8 +43,9 @@ PRAGMATIC WRITE WORKFLOW:
   native review UI shows the diff. Best for consequential changes.
 - Bulk batches (map_files over many files): set_write_mode("write") for the
   batch, review a SAMPLE of diffs with get_diff, verify_staged the risky ones,
-  then commit_write each op. commit_write requires 'path' + 'summary' — that's
-  all the approval prompt shows, so make it say what is being written.
+  then commit_write ONCE with ops:[{op_id,path,summary}] — one approval prompt
+  shows the whole set. commit_write requires 'path' + 'summary' — that's all
+  the approval prompt shows, so make it say what is being written.
   revert_write stages an undo; uncommit_write restores pre-commit content
   directly. Set the mode back to "propose" when done.
 - Long delegations: sync calls past agent_sync_grace_ms return a job_id instead
@@ -57,7 +58,9 @@ INPUT-SIZING:
   large or numerous — the small model's context is small; context_warning tells
   you when you've blown it.
 - Pick model by fit: code transforms -> a coder model, general text -> instruct
-  models. list_models + get_system_resources tell you what fits VRAM.
+  models, similarity/dedup -> embed with an embedding model.
+  count_tokens estimates input size (chars/4) before you commit to a big call.
+  list_models + get_system_resources tell you what fits VRAM.
 
 Safety model: local-model writes are staged ops only; run_command is
 whitelist-only argv-exec (no shell); file access limited to detected+configured

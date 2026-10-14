@@ -8,6 +8,8 @@ import type { FsGuard } from "./fs-guard.ts";
 export interface StagedOp {
   id: string;
   path: string;
+  /** "delete" ops carry the file's last content in oldContent; commit unlinks. */
+  kind: "write" | "delete";
   newContent: string;
   oldContent: string;
   stagedHash: string;
@@ -22,6 +24,8 @@ export interface StagedOp {
 export interface CommittedOp {
   id: string;
   path: string;
+  /** "delete" commits: committedContent is "", oldContent restores via uncommit. */
+  kind: "write" | "delete";
   oldContent: string;
   committedContent: string;
   committedAt: number;
@@ -77,6 +81,7 @@ export function stageWrite(
   const op: StagedOp = {
     id: randomBytes(8).toString("hex"),
     path: p,
+    kind: "write",
     newContent: content,
     oldContent: old,
     stagedHash: sha256(old),
@@ -85,6 +90,38 @@ export function stageWrite(
     createdAt: Date.now(),
     source: input.source ?? "unknown",
     needsReview: input.needsReview ?? false,
+    reviewNote: input.reviewNote,
+  };
+  ops.set(op.id, op);
+  return op;
+}
+
+/**
+ * Stage a file DELETION. Nothing touches disk — commit unlinks, and the file's
+ * pre-delete content rides along in oldContent so uncommit_write restores it.
+ */
+export function stageDelete(
+  guard: FsGuard,
+  input: { path: string; source?: string; reviewNote?: string },
+  ttlMs: number,
+): StagedOp {
+  evictExpired(ttlMs);
+  const p = guard.resolve(input.path);
+  if (!existsSync(p)) throw new Error(`${p} does not exist — nothing to delete`);
+  const old = readFileSync(p, "utf-8");
+  const diff = createTwoFilesPatch(p, p + " (deleted)", old, "", "current", "deleted", { context: 3 });
+  const op: StagedOp = {
+    id: randomBytes(8).toString("hex"),
+    path: p,
+    kind: "delete",
+    newContent: "",
+    oldContent: old,
+    stagedHash: sha256(old),
+    diff,
+    existedBefore: true,
+    createdAt: Date.now(),
+    source: input.source ?? "unknown",
+    needsReview: input.reviewNote !== undefined,
     reviewNote: input.reviewNote,
   };
   ops.set(op.id, op);
@@ -127,15 +164,20 @@ export async function commitOp(
       `file changed since staging: ${p}. Re-stage or call commit_write with force=true to overwrite anyway.`,
     );
   }
-  await mkdir(dirname(p), { recursive: true });
-  const tmp = `${p}.openai-mcp-${op.id}.tmp`;
-  await writeFile(tmp, op.newContent, "utf-8");
-  await rename(tmp, p);
+  if (op.kind === "delete") {
+    await unlink(p).catch(() => {});
+  } else {
+    await mkdir(dirname(p), { recursive: true });
+    const tmp = `${p}.openai-mcp-${op.id}.tmp`;
+    await writeFile(tmp, op.newContent, "utf-8");
+    await rename(tmp, p);
+  }
   ops.delete(id);
 
   const commit: CommittedOp = {
     id: `commit_${op.id}`,
     path: p,
+    kind: op.kind,
     oldContent: op.oldContent,
     committedContent: op.newContent,
     committedAt: Date.now(),
@@ -213,6 +255,7 @@ export async function uncommitOp(
   const undo: CommittedOp = {
     id: `commit_${randomBytes(8).toString("hex")}`,
     path: p,
+    kind: "write", // undoing a delete restores content; undoing a write restores old content
     oldContent: commit.committedContent,
     committedContent: commit.oldContent,
     committedAt: Date.now(),

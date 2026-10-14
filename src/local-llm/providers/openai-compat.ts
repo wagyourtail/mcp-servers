@@ -146,6 +146,20 @@ export class OpenAICompatProvider implements Provider {
     };
   }
 
+  async embed(model: string, input: string[]): Promise<number[][]> {
+    const res = await fetch(`${this.baseUrl}/embeddings`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ model, input }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`${this.name} embeddings -> ${res.status}: ${text.slice(0, 500)}`);
+    }
+    const data = (await res.json()) as { data?: { embedding?: number[] }[] };
+    return (data.data ?? []).map((d) => d.embedding ?? []);
+  }
+
   async listModels(): Promise<ModelInfo[]> {
     const res = await fetch(`${this.baseUrl}/models`, { headers: this.headers() });
     if (!res.ok) {

@@ -106,12 +106,36 @@ export function registerTaskTools(reg: Registrar, tasks: TaskRegistry): void {
   reg.allow(
     "task_wait",
     {
-      description: "Wait up to N seconds for a task to leave 'running'; returns final status (early return on exit).",
+      description:
+        "Wait up to N seconds for a task to leave 'running' (early return on exit). With `match`, " +
+        "also returns early the moment a log line matches the regex — e.g. 'listening on :\\\\d+' for " +
+        "a dev server coming up. Final log scan happens after exit/timeout.",
       inputSchema: {
         id: z.string(),
         seconds: z.number().min(0).max(600).describe("Max wait (default 30)").optional(),
+        match: z.string().optional().describe("Regex — return early when a log line matches"),
       },
     },
-    async ({ id, seconds }) => jsonResult(meta(await tasks.wait(id, seconds ?? 30))),
+    async ({ id, seconds, match }) => {
+      const r = await tasks.wait(id, seconds ?? 30, match);
+      return jsonResult({
+        ...meta(r.task),
+        ...(r.matched !== undefined ? { matched: r.matched, matched_line: r.matchedLine } : {}),
+      });
+    },
+  );
+
+  reg.ask(
+    "task_restart",
+    {
+      description:
+        "Kill (SIGTERM, grace_ms before SIGKILL) and respawn a task with its recorded " +
+        "argv/cwd/env — same id and log file. Ask-tier like task_start: it launches a process.",
+      inputSchema: {
+        id: z.string(),
+        grace_ms: z.number().int().min(0).optional().describe("Ms to wait before SIGKILL (default 3000)"),
+      },
+    },
+    async ({ id, grace_ms }) => jsonResult(meta(await tasks.restart(id, grace_ms))),
   );
 }
