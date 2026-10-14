@@ -1,5 +1,5 @@
 // task_runner MCP server — manage detached long-running processes.
-import { startServer } from "../shared/mcp.ts";
+import { startServer, serverRegistrar } from "../shared/mcp.ts";
 import { TaskRegistry } from "./tasks.ts";
 import { registerTaskTools } from "./tools.ts";
 
@@ -31,9 +31,7 @@ async function main(): Promise<void> {
   await startServer({
     name: "task_runner",
     instructions: INSTRUCTIONS,
-    register: (server) => {
-      registerTaskTools(server, tasks);
-    },
+    register: (server) => registerTaskTools(serverRegistrar(server), tasks),
     afterConnect: () => {
       const running = tasks.list().filter((t) => t.status === "running");
       // stderr only — stdout is the protocol channel.

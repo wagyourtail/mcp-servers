@@ -28,28 +28,31 @@ const outPath =
   outIdx >= 0 ? args[outIdx + 1] : process.env.LOCAL_LLM_CONFIG ?? join(xdg, "openai-mcp", "config.json");
 const clientsIdx = args.indexOf("--clients");
 
-const ALLOW_TOOLS = [
-  "chat", "complete", "summarize", "extract", "classify", "map_files", "decide",
-  "run_local_agent", "list_models", "get_system_resources", "list_staged",
-  "get_diff", "discard_write", "get_usage_stats", "list_dynamic_tools",
-  "get_command_whitelist", "get_job", "list_jobs", "control_job",
-  "get_server_info", "propose_write", "propose_edit", "recommend_model", "list_commits",
-  "revert_write", "search_models", "list_model_tags", "wait",
-].map((t) => `mcp__local_llm__${t}`);
+// --- permissions -------------------------------------------------------------
+// Tool lists are NOT hardcoded here — `index.ts --manifest` runs each server's
+// real registration into a recorder and emits {tools, ask}. A new tool lands in
+// 'allow' automatically unless its server's ASK_TOOLS set marks it ask-tier.
 
-const ASK_TOOLS = [
-  "commit_write", "set_write_mode", "pull_model", "download_model",
-  "delete_model", "prune_models", "register_tool", "unregister_tool",
-  "update_command_whitelist", "unload_model", "uncommit_write", "verify_staged",
-].map((t) => `mcp__local_llm__${t}`);
+interface Manifest {
+  [server: string]: { tools: string[]; ask: string[] };
+}
 
-// task_runner — everything is scoped to tasks the registry itself started
-// (or reattached by pid), so observe/control is allow-tier. task_start is
-// the only ask-tier tool: it's the one that can create arbitrary processes.
-const TASK_ALLOW = ["task_list", "task_status", "task_log", "task_wait", "task_kill", "task_stdin"].map(
-  (t) => `mcp__task_runner__${t}`,
-);
-const TASK_ASK = ["task_start"].map((t) => `mcp__task_runner__${t}`);
+/** Owns every `mcp__<server>__*` prefix we manage — used to scrub stale entries. */
+const OWNED_PERM = /^mcp__(local_llm|task_runner)__/;
+
+function loadManifest(): Manifest {
+  try {
+    const out = execFileSync("node", [serverPath, "--manifest"], {
+      cwd: projectRoot,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    return JSON.parse(out) as Manifest;
+  } catch (e) {
+    console.error(`Failed to enumerate tools via ${serverPath} --manifest:`, e instanceof Error ? e.message : e);
+    process.exit(1);
+  }
+}
 
 interface ProviderDraft {
   type: "ollama" | "openai";
@@ -394,21 +397,31 @@ async function main(): Promise<void> {
         true,
       )));
   if (mergePerms) {
+    const manifest = loadManifest();
+    const allow = Object.entries(manifest).flatMap(([srv, m]) =>
+      m.tools.filter((t) => !m.ask.includes(t)).map((t) => `mcp__${srv}__${t}`),
+    );
+    const askList = Object.entries(manifest).flatMap(([srv, m]) =>
+      m.ask.map((t) => `mcp__${srv}__${t}`),
+    );
     for (const client of permClients) {
       const cfg = readJson<{ permissions?: { allow?: string[]; ask?: string[] } } & Record<string, unknown>>(
         client!.permsPath!,
         {},
       );
       cfg.permissions = cfg.permissions ?? {};
-      const merge = (cur: string[] | undefined, add: string[]): string[] => [
-        ...new Set([...(cur ?? []), ...add]),
+      // Scrub our entries first so tier demotions and removed tools propagate;
+      // other servers' permissions are untouched.
+      const rebuild = (cur: string[] | undefined, add: string[]): string[] => [
+        ...(cur ?? []).filter((t) => !OWNED_PERM.test(t)),
+        ...add,
       ];
       const before = {
         allow: (cfg.permissions.allow ?? []).length,
         ask: (cfg.permissions.ask ?? []).length,
       };
-      cfg.permissions.allow = merge(cfg.permissions.allow, [...ALLOW_TOOLS, ...TASK_ALLOW]);
-      cfg.permissions.ask = merge(cfg.permissions.ask, [...ASK_TOOLS, ...TASK_ASK]);
+      cfg.permissions.allow = rebuild(cfg.permissions.allow, allow);
+      cfg.permissions.ask = rebuild(cfg.permissions.ask, askList);
       writeJson(client!.permsPath!, cfg);
       console.log(
         `Permissions merged (${client!.label}): allow ${before.allow} -> ${cfg.permissions.allow.length}, ask ${before.ask} -> ${cfg.permissions.ask.length}`,

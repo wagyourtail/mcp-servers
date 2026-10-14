@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { pickModel } from "../context.ts";
@@ -50,7 +50,7 @@ async function collectSources(
   return out;
 }
 
-export function registerFileTaskTools(server: McpServer, ctx: ServerContext): void {
+export function registerFileTaskTools(reg: Registrar, ctx: ServerContext): void {
   const INPUT = {
     text: z.string().optional().describe("Inline text instead of files"),
     path: z.string().optional().describe("Single file path (read server-side — never enters your context)"),
@@ -58,7 +58,7 @@ export function registerFileTaskTools(server: McpServer, ctx: ServerContext): vo
     glob: z.string().optional().describe("Glob pattern, e.g. 'src/**/*.ts'"),
   };
 
-  server.registerTool(
+  reg.allow(
     "summarize",
     {
       description:
@@ -103,7 +103,7 @@ export function registerFileTaskTools(server: McpServer, ctx: ServerContext): vo
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "extract",
     {
       description:
@@ -189,7 +189,7 @@ export function registerFileTaskTools(server: McpServer, ctx: ServerContext): vo
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "classify",
     {
       description: "Classify text/file content into one or more labels with the local model.",
@@ -250,7 +250,7 @@ export function registerFileTaskTools(server: McpServer, ctx: ServerContext): vo
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "decide",
     {
       description:
@@ -329,7 +329,7 @@ export function registerFileTaskTools(server: McpServer, ctx: ServerContext): vo
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "map_files",
     {
       description:

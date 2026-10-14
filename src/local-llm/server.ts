@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
-import { startServer } from "../shared/mcp.ts";
+import { startServer, serverRegistrar } from "../shared/mcp.ts";
 import { fileURLToPath } from "node:url";
 import { buildContext } from "./context.ts";
-import { registerCompletionTools } from "./tools/completions.ts";
-import { registerFileTaskTools } from "./tools/filetasks.ts";
-import { registerDelegateTools } from "./tools/delegate.ts";
-import { registerWriteTools } from "./tools/writes.ts";
-import { registerManageTools } from "./tools/manage.ts";
-import { registerDynamicToolTools, loadPersistedDynamicTools } from "./tools/dynamic.ts";
-import { registerWhitelistTools } from "./tools/whitelist.ts";
+import { registerAll } from "./registration.ts";
 import { registerPrompts } from "./prompts.ts";
+import { loadPersistedDynamicTools } from "./tools/dynamic.ts";
 import { setRequestTimeout } from "./tools/helpers.ts";
 
 const INSTRUCTIONS = `local_llm is a LOCAL SUBAGENT service: its tools run on a cheap local model
@@ -84,13 +79,7 @@ async function main(): Promise<void> {
     instructions: INSTRUCTIONS,
     capabilities: { tools: {}, prompts: {} },
     register: (server) => {
-      registerCompletionTools(server, ctx);
-      registerFileTaskTools(server, ctx);
-      registerDelegateTools(server, ctx);
-      registerWriteTools(server, ctx);
-      registerManageTools(server, ctx);
-      registerDynamicToolTools(server, ctx);
-      registerWhitelistTools(server, ctx);
+      registerAll(serverRegistrar(server), ctx);
       registerPrompts(server);
     },
     afterConnect: async (server) => {

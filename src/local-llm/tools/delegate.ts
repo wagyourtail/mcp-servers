@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { pickModel } from "../context.ts";
@@ -168,8 +168,8 @@ async function doDelegate(
   };
 }
 
-export function registerDelegateTools(server: McpServer, ctx: ServerContext): void {
-  server.registerTool(
+export function registerDelegateTools(reg: Registrar, ctx: ServerContext): void {
+  reg.allow(
     "run_local_agent",
     {
       description:
@@ -209,7 +209,7 @@ export function registerDelegateTools(server: McpServer, ctx: ServerContext): vo
       job.abort = () => ac.abort();
       const run = doDelegate(
         ctx,
-        params,
+        params as DelegateParams,
         (msg, n) => {
           updateJob(job.id, { step: n, last: msg });
           report(msg, n);

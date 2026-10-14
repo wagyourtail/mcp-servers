@@ -1,11 +1,11 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { saveCommandWhitelist } from "../config.ts";
 import { jsonResult } from "./helpers.ts";
 
-export function registerWhitelistTools(server: McpServer, ctx: ServerContext): void {
-  server.registerTool(
+export function registerWhitelistTools(reg: Registrar, ctx: ServerContext): void {
+  reg.allow(
     "get_command_whitelist",
     {
       description:
@@ -21,7 +21,7 @@ export function registerWhitelistTools(server: McpServer, ctx: ServerContext): v
       }),
   );
 
-  server.registerTool(
+  reg.ask(
     "update_command_whitelist",
     {
       description:
@@ -53,7 +53,7 @@ export function registerWhitelistTools(server: McpServer, ctx: ServerContext): v
       ctx.config.command_whitelist.commands = commands;
       return jsonResult({
         updated: true,
-        added: (add ?? []).map((a) => a.name),
+        added: (add ?? []).map((a: { name: string }) => a.name),
         removed: remove ?? [],
         commands: Object.keys(commands),
         config_path: ctx.configPath,

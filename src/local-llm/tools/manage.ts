@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import { execFile } from "node:child_process";
 import type { ServerContext } from "../context.ts";
@@ -30,8 +30,8 @@ async function findHfCli(): Promise<string | null> {
   return null;
 }
 
-export function registerManageTools(server: McpServer, ctx: ServerContext): void {
-  server.registerTool(
+export function registerManageTools(reg: Registrar, ctx: ServerContext): void {
+  reg.allow(
     "list_models",
     {
       description:
@@ -58,7 +58,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "get_system_resources",
     {
       description:
@@ -98,7 +98,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     }
   }
 
-  server.registerTool(
+  reg.ask(
     "pull_model",
     {
       description:
@@ -125,7 +125,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "search_models",
     {
       description:
@@ -163,7 +163,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "list_model_tags",
     {
       description:
@@ -200,7 +200,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "download_model",
     {
       description:
@@ -250,7 +250,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "get_job",
     { description: "Get status/progress of a background job (e.g. a model pull).", inputSchema: { job_id: z.string() } },
     async ({ job_id }) => {
@@ -260,13 +260,13 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "list_jobs",
     { description: "List background jobs (most recent first).", inputSchema: {} },
     async () => jsonResult({ jobs: listJobs() }),
   );
 
-  server.registerTool(
+  reg.allow(
     "wait",
     {
       description:
@@ -296,7 +296,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "control_job",
     {
       description:
@@ -320,7 +320,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "recommend_model",
     {
       description:
@@ -452,7 +452,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "delete_model",
     {
       description:
@@ -482,7 +482,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "prune_models",
     {
       description:
@@ -546,7 +546,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "unload_model",
     {
       description: "Unload a model from VRAM on an ollama provider (frees memory immediately).",
@@ -560,7 +560,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "get_usage_stats",
     {
       description:
@@ -571,7 +571,7 @@ export function registerManageTools(server: McpServer, ctx: ServerContext): void
     async () => jsonResult({ stats: getStats() }),
   );
 
-  server.registerTool(
+  reg.allow(
     "get_server_info",
     {
       description:

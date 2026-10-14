@@ -29,6 +29,8 @@ fits its strengths, delegate instead of doing it in-context — that's the produ
   (nvtop/DRM cardN/lspci orders differ). See `src/lib/sysinfo.ts`.
 - Ollama env discovery falls back `/proc` → systemd unit → journal; report
   `env_source` rather than silently reporting no pinning.
-- Read-only tools go in `ALLOW_TOOLS` in `scripts/configure.ts` + the README
-  permissions block; anything that writes/deletes/pulls goes in `ASK_TOOLS`.
+- Tool permission tiers are declared at registration: read-only tools register
+  via `reg.allow(...)`, anything that writes/deletes/pulls/spawns via `reg.ask(...)`.
+  `node src/index.ts --manifest` emits the `{tools, ask}` map that
+  `scripts/configure.ts` merges into client permissions — no parallel tool list.
 - Staged writes: nothing the local model writes reaches disk without `commit_write`.

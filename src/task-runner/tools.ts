@@ -1,6 +1,5 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { jsonResult } from "../shared/mcp.ts";
+import { jsonResult, type Registrar } from "../shared/mcp.ts";
 import type { TaskRegistry } from "./tasks.ts";
 
 function meta(t: import("./tasks.ts").TaskMeta): Record<string, unknown> {
@@ -19,8 +18,8 @@ function meta(t: import("./tasks.ts").TaskMeta): Record<string, unknown> {
   };
 }
 
-export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void {
-  server.registerTool(
+export function registerTaskTools(reg: Registrar, tasks: TaskRegistry): void {
+  reg.ask(
     "task_start",
     {
       description:
@@ -38,7 +37,7 @@ export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void 
     async ({ argv, name, cwd, env, stdin }) => jsonResult(meta(tasks.start({ argv, name, cwd, env, stdin }))),
   );
 
-  server.registerTool(
+  reg.allow(
     "task_list",
     {
       description: "List all tasks known to this server (newest first), including ones reattached after a restart.",
@@ -47,7 +46,7 @@ export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void 
     async () => jsonResult({ tasks: tasks.list().map(meta) }),
   );
 
-  server.registerTool(
+  reg.allow(
     "task_status",
     {
       description: "Status of one task: running/exited/killed/lost, pid, exit code, log path.",
@@ -60,7 +59,7 @@ export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void 
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "task_log",
     {
       description: "Read the tail of a task's combined stdout+stderr log file.",
@@ -73,7 +72,7 @@ export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void 
     async ({ id, lines, max_bytes }) => jsonResult({ ...tasks.log(id, lines, max_bytes) }),
   );
 
-  server.registerTool(
+  reg.allow(
     "task_stdin",
     {
       description:
@@ -89,7 +88,7 @@ export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void 
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "task_kill",
     {
       description:
@@ -104,7 +103,7 @@ export function registerTaskTools(server: McpServer, tasks: TaskRegistry): void 
       jsonResult(meta(await tasks.kill(id, signal as NodeJS.Signals | undefined, grace_ms))),
   );
 
-  server.registerTool(
+  reg.allow(
     "task_wait",
     {
       description: "Wait up to N seconds for a task to leave 'running'; returns final status (early return on exit).",

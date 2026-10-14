@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { pickModel } from "../context.ts";
@@ -13,8 +13,8 @@ const COMMON = {
   ...GEN_PARAMS,
 };
 
-export function registerCompletionTools(server: McpServer, ctx: ServerContext): void {
-  server.registerTool(
+export function registerCompletionTools(reg: Registrar, ctx: ServerContext): void {
+  reg.allow(
     "chat",
     {
       description:
@@ -60,7 +60,7 @@ export function registerCompletionTools(server: McpServer, ctx: ServerContext): 
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "complete",
     {
       description:

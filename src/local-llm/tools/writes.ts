@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { pickModel } from "../context.ts";
@@ -8,8 +8,8 @@ import { applyEdits, parseEditBlocks, type ApplyResult } from "../lib/edits.ts";
 import { verifyStagedOp } from "../lib/verify.ts";
 import { patchConfig } from "../config.ts";
 
-export function registerWriteTools(server: McpServer, ctx: ServerContext): void {
-  server.registerTool(
+export function registerWriteTools(reg: Registrar, ctx: ServerContext): void {
+  reg.allow(
     "propose_write",
     {
       description:
@@ -62,7 +62,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "propose_edit",
     {
       description:
@@ -142,7 +142,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "list_staged",
     {
       description: "List pending staged writes (proposed changes not yet on disk).",
@@ -156,7 +156,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
       }),
   );
 
-  server.registerTool(
+  reg.allow(
     "get_diff",
     {
       description: "Show the unified diff for a staged write op.",
@@ -181,7 +181,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "set_write_mode",
     {
       description:
@@ -200,7 +200,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "commit_write",
     {
       description:
@@ -246,7 +246,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "verify_staged",
     {
       description:
@@ -286,7 +286,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "discard_write",
     {
       description: "Drop a staged write op without applying it.",
@@ -295,7 +295,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     async ({ op_id }) => jsonResult({ discarded: discardOp(op_id) }),
   );
 
-  server.registerTool(
+  reg.allow(
     "list_commits",
     {
       description: "List recently committed writes (last 20) — for revert_write.",
@@ -304,7 +304,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     async () => jsonResult({ commits: listCommits() }),
   );
 
-  server.registerTool(
+  reg.allow(
     "revert_write",
     {
       description:
@@ -324,7 +324,7 @@ export function registerWriteTools(server: McpServer, ctx: ServerContext): void 
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "uncommit_write",
     {
       description:

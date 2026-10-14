@@ -81,36 +81,23 @@ Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/p
 
 *`npm run configure` merges these for you (with a backup) — shown here for manual setup.*
 
-In `~/.config/devin/config.json`:
+In `~/.config/devin/config.json` (or `~/.claude/settings.json` — same syntax):
 
 ```json
 {
   "permissions": {
-    "allow": ["mcp__local_llm__chat", "mcp__local_llm__complete", "mcp__local_llm__summarize",
-              "mcp__local_llm__extract", "mcp__local_llm__classify", "mcp__local_llm__map_files",
-              "mcp__local_llm__decide",
-              "mcp__local_llm__run_local_agent", "mcp__local_llm__list_models",
-              "mcp__local_llm__get_system_resources", "mcp__local_llm__list_staged",
-              "mcp__local_llm__get_diff", "mcp__local_llm__discard_write",
-              "mcp__local_llm__get_usage_stats", "mcp__local_llm__list_dynamic_tools",
-              "mcp__local_llm__get_command_whitelist", "mcp__local_llm__get_job",
-              "mcp__local_llm__list_jobs", "mcp__local_llm__control_job",
-              "mcp__local_llm__get_server_info", "mcp__local_llm__propose_write",
-              "mcp__local_llm__propose_edit",
-              "mcp__local_llm__recommend_model", "mcp__local_llm__list_commits",
-              "mcp__local_llm__revert_write", "mcp__local_llm__search_models",
-              "mcp__local_llm__list_model_tags", "mcp__local_llm__wait"],
-    "ask":   ["mcp__local_llm__commit_write", "mcp__local_llm__set_write_mode",
-              "mcp__local_llm__pull_model", "mcp__local_llm__download_model",
-              "mcp__local_llm__delete_model", "mcp__local_llm__prune_models",
-              "mcp__local_llm__register_tool", "mcp__local_llm__unregister_tool",
-              "mcp__local_llm__update_command_whitelist", "mcp__local_llm__unload_model",
-              "mcp__local_llm__uncommit_write", "mcp__local_llm__verify_staged"]
+    "allow": ["mcp__local_llm__chat", "mcp__local_llm__summarize", "…", "mcp__task_runner__task_kill"],
+    "ask":   ["mcp__local_llm__commit_write", "…", "mcp__task_runner__task_start"]
   }
 }
 ```
 
-`ask` = you get an approve button before writes hit disk, models download, or new tools register.
+The lists aren't hardcoded: each tool declares its tier at registration (`reg.allow`
+/ `reg.ask` in `src/*/tools/`), and `node src/index.ts --manifest` emits the full
+`{tools, ask}` map the configure script merges. `ask` = approve button before writes
+hit disk, models download, or processes spawn. Everything else is allow-tier;
+`task_start` is task_runner's only ask tool — kill/stdin/wait are scoped to
+registry-managed tasks.
 
 ## Tools
 

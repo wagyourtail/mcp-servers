@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Registrar } from "../../shared/mcp.ts";
 import { z } from "zod";
 import type { ServerContext } from "../context.ts";
 import { jsonResult } from "./helpers.ts";
@@ -14,8 +14,8 @@ import {
 } from "../lib/dynamic-tools.ts";
 import { dynamicToolsPath } from "../config.ts";
 
-export function registerDynamicToolTools(server: McpServer, ctx: ServerContext): void {
-  server.registerTool(
+export function registerDynamicToolTools(reg: Registrar, ctx: ServerContext): void {
+  reg.ask(
     "register_tool",
     {
       description:
@@ -64,7 +64,7 @@ export function registerDynamicToolTools(server: McpServer, ctx: ServerContext):
     },
   );
 
-  server.registerTool(
+  reg.ask(
     "unregister_tool",
     {
       description: "Remove a runtime-registered dynamic tool.",
@@ -77,7 +77,7 @@ export function registerDynamicToolTools(server: McpServer, ctx: ServerContext):
     },
   );
 
-  server.registerTool(
+  reg.allow(
     "list_dynamic_tools",
     {
       description: "List runtime-registered tools available to the local agent.",
