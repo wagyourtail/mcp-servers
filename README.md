@@ -147,7 +147,7 @@ Slash commands (MCP prompts): `/mcp__local_llm__delegate <task> [files]` and `/m
 
 ## task_runner — a second server
 
-This repo also ships `task_runner` (`src/taskd.ts`, registered by `npm run configure` alongside `local_llm`) — a process manager for long-running background tasks: dev servers, build watchers, downloads, test loops.
+This repo also ships `task_runner` (registered by `npm run configure` alongside `local_llm`) — a process manager for long-running background tasks: dev servers, build watchers, downloads, test loops.
 
 | Tool | What it does |
 |---|---|
@@ -158,7 +158,7 @@ This repo also ships `task_runner` (`src/taskd.ts`, registered by `npm run confi
 | `task_kill` | Signal the whole process group — SIGTERM default, SIGKILL after `grace_ms`. |
 | `task_wait` | Return early when the task exits (up to `seconds`, max 600) — no busy polling. |
 
-Shared scaffolding (`src/lib/preflight.ts` dep-check + `src/lib/mcp.ts` server bootstrap) is what both servers are built on — add another by writing `src/<name>-server.ts` + a thin entry like `taskd.ts`.
+Both servers launch through one entry: `node src/index.ts` (defaults to `local_llm`) or `node src/index.ts task_runner`. Server code lives in `src/local-llm/` and `src/task-runner/`; `src/shared/` (`preflight.ts` dep-check + `mcp.ts` bootstrap) is the common kit — add another server by writing `src/<name>/server.ts` and one line in `index.ts`'s `SERVERS` map.
 
 ## Generation params
 

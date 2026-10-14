@@ -17,7 +17,6 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(here, "..");
 const serverPath = join(projectRoot, "src", "index.ts");
-const taskdPath = join(projectRoot, "src", "taskd.ts");
 const args = argv.slice(2);
 const YES = args.includes("--yes");
 const PRINT_ONLY = args.includes("--print-devin");
@@ -45,7 +44,7 @@ const ASK_TOOLS = [
   "update_command_whitelist", "unload_model", "uncommit_write", "verify_staged",
 ].map((t) => `mcp__local_llm__${t}`);
 
-// task_runner (src/taskd.ts) — read-only observation is allow-tier; anything
+// task_runner — read-only observation is allow-tier; anything
 // that starts/signals/feeds a process is ask-tier.
 const TASK_ALLOW = ["task_list", "task_status", "task_log", "task_wait"].map(
   (t) => `mcp__task_runner__${t}`,
@@ -107,7 +106,7 @@ function serverEntry(env: Record<string, string>): object {
 }
 
 function taskdEntry(): object {
-  return { command: "node", args: [taskdPath] };
+  return { command: "node", args: [serverPath, "task_runner"] };
 }
 
 async function main(): Promise<void> {
