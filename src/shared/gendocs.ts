@@ -41,20 +41,29 @@ function renderParams(schema: Record<string, unknown> | undefined): string {
   return ["| Param | Type | Required | Default | Description |", "|---|---|---|---|---|", ...rows].join("\n");
 }
 
-/** Render one server's doc page: instructions excerpt + one section per tool. */
-export function renderServerDocs(server: string, instructions: string, specs: ToolDoc[]): string {
+/** Render one server's doc page: summary + instructions + one section per tool. */
+export function renderServerDocs(
+  server: string,
+  summary: string,
+  instructions: string,
+  specs: ToolDoc[],
+): string {
   const out = [
     `# \`${server}\` tools`,
     "",
     `> Generated from live registrations by \`npm run docs\` — do not edit by hand.`,
     "",
+    summary,
+    "",
     "## Server instructions",
     "",
-    "What MCP clients see at session start:",
+    "<details><summary>What MCP clients see at session start (model-facing, terse)</summary>",
     "",
     "```",
     instructions.trim(),
     "```",
+    "",
+    "</details>",
     "",
     "## Tools",
     "",

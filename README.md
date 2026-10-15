@@ -104,41 +104,30 @@ registry-managed tasks.
 > Full per-tool reference — descriptions, parameters, types, defaults — is generated
 > from the live registrations: [docs/local_llm.md](docs/local_llm.md) and
 > [docs/task_runner.md](docs/task_runner.md) (`npm run docs` regenerates;
-> `npm run docs:check` verifies freshness). The tables below are a summary.
+> `npm run docs:check` verifies freshness).
 
-| Tool | What it does |
-|---|---|
-| `run_local_agent` | **Local subagent.** Small model runs its own tool loop; returns final answer + staged op ids. `verify:"self"` adds a critique pass. Sync calls wait up to `agent_sync_grace_ms` (default 45s), then return a `job_id` instead of losing the result; `run_async:true` skips the wait and returns a job immediately (poll `get_job`). |
-| `chat` | Raw completion passthrough — `prompt`+`system` for one-shot, `messages` for full conversations. |
-| `summarize` | Summarize files/globs server-side; only summaries return. |
-| `extract` | Structured JSON extraction, optional schema validation + retry. |
-| `classify` | Label text/files into candidate labels. |
-| `decide` | **Decision models** (ollama `/v1/systemone` — `clef-flash`, `nimble`, `tev`). Scores 1–64 typed questions (`choice`/`score`/`noul`) about a state in one forward pass → calibrated probabilities per option. No generation, no parsing — prefer over `classify` when a decision model is installed. State comes from `state` text or files read server-side. Needs ollama ≥0.40 (`clef-flash` is on the registry: `ollama pull clef-flash`). |
-| `map_files` | Apply one instruction across a glob — `report` results or `stage_writes` for review. |
-| `embed` | Text embeddings for text/files (`text`/`path`/`paths`/`glob`) — semantic dedup, clustering, find-similar. Needs an embedding model (`nomic-embed-text`, `embeddinggemma`). Returns raw vectors. |
-| `count_tokens` | chars/4 token estimate for text/files — size inputs against `num_ctx` before delegating. |
-| `propose_write` | Local model rewrites/creates one file → staged diff. |
-| `propose_edit` | Patch-style edit: the model returns `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` hunks instead of the whole file; the server applies them to current content and stages the result. Cheaper + safer than `propose_write` for localized changes — a non-matching hunk is a clean error, not a truncated file. |
-| `stage_delete` | Stage a file deletion — diff shows all lines removed, `commit_write` unlinks, `uncommit_write` restores. The local agent gets this too. |
-| `list_staged` / `get_diff` / `commit_write` / `discard_write` | Staged-write lifecycle. **Nothing the local model writes reaches disk without `commit_write`.** Commit refuses if the file drifted since staging (`force=true` overrides) — and entirely while `write_mode` is `propose`. `commit_write` requires `path` + `summary` args so the approval prompt shows *what* is being written, not just an opaque op id; the `path` is verified against the staged op. `ops:[{op_id,path,summary}]` commits a batch in one approval. |
-| `set_write_mode` | `propose` (default): server stages diffs only; Devin applies via its own edit tools (`get_diff include_content` for full content). `write`: `commit_write` writes to disk. `persist:true` saves to config. |
-| `verify_staged` | Lint/typecheck a staged op **without touching the real file**: content is materialized to a temp file in the same directory (imports resolve), `{file}` in argv substitutes the temp path, runs under the command whitelist, then cleans up. `restore_paths` snapshots/restores side files the checker may rewrite. The local agent gets this too — `run_command` on the real path only sees old disk content. |
-| `list_commits` / `revert_write` / `uncommit_write` | Undo: `revert_write(commit_id)` stages a revert op (reviewed path); `uncommit_write(commit_id)` restores pre-commit content immediately in `write` mode (deletes files the commit created; drift-checked). |
-| `list_models` | Models per provider (sizes, capabilities, last-modified). |
-| `get_system_resources` | RAM + VRAM + loaded models (local ollama only). `ollama_gpu` reports which GPU(s) the server is pinned to (env vars) or observed using (runner process device fds). |
-| `recommend_model` | Rank installed models vs detected memory budget (pinned/observed GPU > discrete GPU > RAM) with three-way `fit` verdicts (`yes`/`marginal`/`no`). `apply:true` writes `default_model` to config and applies live; `model:"x:y"` + `apply:true` sets an explicit default. |
-| `search_models` | Search the public ollama registry for models — name, description, capability chips (tools/thinking/vision), parameter sizes, installed flag. |
-| `list_model_tags` | Pullable tags for a registry model (`gemma4` → `e4b`, `12b`, `26b`, …); `include_sizes:true` fetches real download sizes via the manifest API. |
-| `pull_model` | Download a model on ollama — background job, poll `get_job`. |
-| `control_job` | Steer a running job: `pause`/`resume`/`cancel`/`inject` (inject = operator instruction the local agent sees next step). |
-| `wait_job` | Sleep N seconds (max 600); with `job_id` returns early when the job finishes — poll long pulls/agent runs without busy-looping `get_job`. |
-| `download_model` | Download from Hugging Face via `hf` CLI (for llama.cpp/TabbyAPI/vLLM servers). Background job. |
-| `unload_model` | Free a model's VRAM. |
-| `delete_model` | Permanently delete a model (irreversible). Refuses to delete the provider default or a loaded model without `force:true`. |
-| `prune_models` | Bulk-delete old models. `dry_run:true` (default) reports candidates + reclaimable bytes; always keeps `keep[]`, the provider default, loaded models, `keep_recent` newest, `max_age_days` recent pulls, and `unused_days` models used recently (per-model last-used is persisted to `model-usage.json` next to the config — models with no record are kept). |
-| `register_agent_tool` / `unregister_agent_tool` / `list_agent_tools` | Give the local agent new tools at runtime (`shell` templates or `js` snippets). |
-| `get_command_whitelist` / `update_command_whitelist` | Manage what `run_command` may execute. |
-| `get_usage_stats` / `get_server_info` | Session savings + effective config. |
+Tools group by job:
+
+- **Delegate** — `run_local_agent` (local model runs its own tool loop on the task),
+  `chat`, `summarize`, `extract`, `classify`, `decide` (calibrated decision
+  models, no generation), `map_files` (one instruction across a glob),
+  `embed`, `count_tokens`.
+- **Staged writes** — `propose_write`/`propose_edit`/`stage_delete` produce
+  reviewable diffs; `commit_write` (incl. batch `ops:[...]`) / `discard_write`
+  settle them; `set_write_mode` gates whether commits reach disk;
+  `verify_staged` lints a draft in a temp file; undo via `list_commits`,
+  `revert_write`, `uncommit_write`. **Nothing reaches disk without commit_write.**
+- **Models** — `list_models`, `search_models`, `list_model_tags`,
+  `recommend_model` (VRAM/RAM-aware, `apply:true` sets default), `pull_model`,
+  `download_model`, `unload_model`, `delete_model`, `prune_models`,
+  `get_system_resources`.
+- **Jobs** — `get_job`, `list_jobs`, `wait_job`, `control_job` (pause/inject/cancel
+  long pulls and agent runs).
+- **Agent tools & exec policy** — `register_agent_tool`/`unregister_agent_tool`/
+  `list_agent_tools` (runtime tools for the local agent only),
+  `get_command_whitelist`/`update_command_whitelist`.
+- **Meta** — `get_server_info` (providers/roots/flags — call first),
+  `get_usage_stats` (session savings).
 
 Slash commands (MCP prompts): `/mcp__local_llm__delegate <task> [files]` and `/mcp__local_llm__cheap_summary <path> [focus]`.
 
@@ -146,15 +135,7 @@ Slash commands (MCP prompts): `/mcp__local_llm__delegate <task> [files]` and `/m
 
 This repo also ships `task_runner` (registered by `npm run configure` alongside `local_llm`) — a process manager for long-running background tasks: dev servers, build watchers, downloads, test loops.
 
-| Tool | What it does |
-|---|---|
-| `task_start` | Spawn a detached process (`argv`, no shell; optional `name`/`cwd`/`env`/`stdin`/`log`). Survives server restarts. stdout+stderr append to `<id>.log` in the state dir (`~/.local/state/taskd/`, override `TASKD_STATE_DIR`) — or pass `log` to pick the file (relative to `cwd`, dirs created, exempt from auto-prune). |
-| `task_list` / `task_status` | All known tasks (reattached after restarts) / one task's status, pid, exit code, log path. |
-| `task_log` | Tail the task's combined log (`lines`, `max_bytes`). |
-| `task_stdin` | Write to a task's stdin (requires `stdin:true` at start; unavailable on reattached tasks). |
-| `task_kill` | Signal the whole process group — SIGTERM default, SIGKILL after `grace_ms`. |
-| `task_restart` | Kill + respawn with the recorded argv/cwd/env — same id and log. Ask-tier like `task_start` (it launches a process). |
-| `task_wait` | Return early when the task exits (up to `seconds`, max 600 — `TASKD_MAX_WAIT_S` env overrides, `-1` uncaps; `seconds:-1` waits until exit) — no busy polling. `match:"regex"` also returns early when a log line matches (e.g. `listening on :\d+`). |
+- `task_start` spawns a detached process (`argv` — no shell; optional `name`/`cwd`/`env`/`stdin`/`log`). `task_list`/`task_status`/`task_log` inspect it, `task_stdin` feeds it, `task_kill` signals the whole process group, `task_restart` respawns the recorded spec, and `task_wait` returns early on exit or a log-regex `match` (`seconds:-1` waits uncapped). `task_start`/`task_restart` are ask-tier; the rest are allow-tier. Full reference: [docs/task_runner.md](docs/task_runner.md).
 
 Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF). Logs at a caller-chosen `log` path are never pruned.
 

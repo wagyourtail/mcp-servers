@@ -2,6 +2,11 @@ import { z } from "zod";
 import { jsonResult, type Registrar } from "../shared/mcp.ts";
 import type { TaskRegistry } from "./tasks.ts";
 
+export const SUMMARY =
+  "Detached long-running processes that survive MCP server restarts — " +
+  "dev servers, watchers, downloads — with per-task logs, process-group kill, " +
+  "stdin, respawn, and regex-aware waiting.";
+
 export const INSTRUCTIONS = `task_runner manages detached LONG-RUNNING processes: build watchers, dev
 servers, test loops, downloads — anything you'd otherwise run in a terminal tab
 and lose track of.

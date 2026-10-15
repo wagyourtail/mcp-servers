@@ -2,9 +2,11 @@
 
 > Generated from live registrations by `npm run docs` — do not edit by hand.
 
+Offloads low-complexity, repetitive work — summarize, extract, classify, bulk file transforms, embeddings, staged edits — to a cheap local model (Ollama or OpenAI-compatible) so the client doesn't spend frontier-model context and tokens on it. Includes a local tool-calling agent, reviewable staged writes, whitelisted command exec, and Ollama model management.
+
 ## Server instructions
 
-What MCP clients see at session start:
+<details><summary>What MCP clients see at session start (model-facing, terse)</summary>
 
 ```
 local_llm is a LOCAL SUBAGENT service: its tools run on a cheap local model
@@ -68,6 +70,8 @@ roots; dynamic tools + run_command need env flags.
 Workflow hint: call get_server_info first to see providers/roots/flags/mode, and
 get_usage_stats at the end of a session to see what you saved.
 ```
+
+</details>
 
 ## Tools
 

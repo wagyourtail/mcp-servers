@@ -26,7 +26,17 @@ if (arg === "--manifest") {
     local_llm: collectManifest((reg) => llm.registerAll(reg, undefined as never)),
     task_runner: collectManifest((reg) => task.registerTaskTools(reg, undefined as never)),
   };
-  console.log(JSON.stringify(manifest, null, 2));
+  // Synchronous fd write with retry — process.exit can truncate an async
+  // stdout flush, and writeSync may return early on a non-blocking pipe.
+  const { writeSync } = await import("node:fs");
+  const buf = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
+  for (let off = 0; off < buf.length;) {
+    try {
+      off += writeSync(1, buf.subarray(off));
+    } catch {
+      await new Promise((r) => setTimeout(r, 10)); // EAGAIN: wait for the reader
+    }
+  }
   process.exit(0);
 }
 
@@ -43,14 +53,14 @@ if (arg === "--docs") {
   const llm = await import("./local-llm/registration.ts");
   const task = await import("./task-runner/tools.ts");
   const servers = [
-    { name: "local_llm", instructions: llm.INSTRUCTIONS, manifest: collectManifest((reg) => llm.registerAll(reg, undefined as never)) },
-    { name: "task_runner", instructions: task.INSTRUCTIONS, manifest: collectManifest((reg) => task.registerTaskTools(reg, undefined as never)) },
+    { name: "local_llm", summary: llm.SUMMARY, instructions: llm.INSTRUCTIONS, manifest: collectManifest((reg) => llm.registerAll(reg, undefined as never)) },
+    { name: "task_runner", summary: task.SUMMARY, instructions: task.INSTRUCTIONS, manifest: collectManifest((reg) => task.registerTaskTools(reg, undefined as never)) },
   ];
   mkdirSync(outdir, { recursive: true });
   let stale = 0;
   for (const s of servers) {
     const path = join(outdir, `${s.name}.md`);
-    const md = renderServerDocs(s.name, s.instructions, s.manifest.specs);
+    const md = renderServerDocs(s.name, s.summary, s.instructions, s.manifest.specs);
     if (check) {
       if (!existsSync(path) || readFileSync(path, "utf-8") !== md) {
         console.error(`stale: ${path} — run \`npm run docs\``);

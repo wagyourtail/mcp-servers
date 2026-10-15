@@ -2,9 +2,11 @@
 
 > Generated from live registrations by `npm run docs` — do not edit by hand.
 
+Detached long-running processes that survive MCP server restarts — dev servers, watchers, downloads — with per-task logs, process-group kill, stdin, respawn, and regex-aware waiting.
+
 ## Server instructions
 
-What MCP clients see at session start:
+<details><summary>What MCP clients see at session start (model-facing, terse)</summary>
 
 ```
 task_runner manages detached LONG-RUNNING processes: build watchers, dev
@@ -33,6 +35,8 @@ Semantics:
 - Logs live under the state dir (default ~/.local/state/taskd/, override with
   TASKD_STATE_DIR) as <task-id>.log — append-only, not rotated.
 ```
+
+</details>
 
 ## Tools
 

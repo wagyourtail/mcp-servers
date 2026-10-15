@@ -11,6 +11,13 @@ import { registerManageTools } from "./tools/manage.ts";
 import { registerDynamicToolTools } from "./tools/dynamic.ts";
 import { registerWhitelistTools } from "./tools/whitelist.ts";
 
+export const SUMMARY =
+  "Offloads low-complexity, repetitive work — summarize, extract, classify, " +
+  "bulk file transforms, embeddings, staged edits — to a cheap local model " +
+  "(Ollama or OpenAI-compatible) so the client doesn't spend frontier-model " +
+  "context and tokens on it. Includes a local tool-calling agent, reviewable " +
+  "staged writes, whitelisted command exec, and Ollama model management.";
+
 export const INSTRUCTIONS = `local_llm is a LOCAL SUBAGENT service: its tools run on a cheap local model
 (default Ollama) so YOU don't spend expensive tokens on low-complexity work.
 
