@@ -1,6 +1,6 @@
 // tasktop — a `top`-style TUI for task_runner tasks. Pure builtins: reads
 // tasks.json + /proc directly, so it works whether or not the server is up.
-// Entry: `node src/index.ts top` (or `npm run top`).
+// Entry: `node src/index.ts task_runner_top` (or `npm run task_runner_top`).
 import { emitKeypressEvents } from "node:readline";
 import { existsSync, openSync, readFileSync, readSync, closeSync, statSync } from "node:fs";
 import { homedir } from "node:os";

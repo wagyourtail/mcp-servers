@@ -180,7 +180,7 @@ This repo also ships `task_runner` (registered by `npm run configure` alongside 
 
 - `task_start` spawns a detached process (`argv` — no shell; optional `name`/`cwd`/`env`/`stdin`/`log`). `task_list`/`task_status`/`task_log` inspect it, `task_stdin` feeds it, `task_kill` signals the whole process group, `task_restart` respawns the recorded spec, and `task_wait` returns early on exit or a log-regex `match` (`seconds:-1` waits uncapped). `task_start`/`task_restart` are ask-tier; the rest are allow-tier. Full reference: [docs/task_runner.md](docs/task_runner.md).
 
-For a human view: `npm run top` opens a `top`-style TUI over `tasks.json` — live status, CPU%, RSS, age, log tail; `x`/`X` SIGTERM/SIGKILL the selected group, `l` pages the log, `q` quits. Works without the server running (reads the registry + `/proc` directly), and flags `!pid-reused` when a dead pid got recycled by an unrelated process.
+For a human view: `npm run task_runner_top` opens a `top`-style TUI over `tasks.json` — live status, CPU%, RSS, age, log tail; `x`/`X` SIGTERM/SIGKILL the selected group, `l` pages the log, `q` quits. Works without the server running (reads the registry + `/proc` directly), and flags `!pid-reused` when a dead pid got recycled by an unrelated process.
 
 Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF). Logs at a caller-chosen `log` path are never pruned. The registry itself is bounded too: stopped tasks are dropped when older than `TASKD_KEEP_DAYS` (default 14) or beyond `TASKD_KEEP` entries (default 100) — custom logs are kept, state-dir logs go with the entry.
 
@@ -302,6 +302,6 @@ npm run smoke       # end-to-end: spawns server, hits real ollama
 npm run build       # optional: emit dist/ for node<22.18 or distribution
 npm run docs        # regenerate docs/<server>.md from live tool registrations
 npm run docs:check  # fail if docs/ is stale (CI)
-npm run top         # TUI: top for task_runner tasks (no server needed)
+npm run task_runner_top  # TUI: top for task_runner tasks (no server needed)
 node src/index.ts   # run the server standalone (stdin MCP)
 ```

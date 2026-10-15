@@ -10,7 +10,7 @@ OpenAI-compatible model. Entry point `src/index.ts` (deps preflight → `server.
 - `npm test` — `node --test test/*.test.ts` (parsers tested against fixtures, no network)
 - `npm run smoke` — end-to-end vs live ollama (needs `gemma4:e4b` or config default pulled)
 - `npm run configure` — interactive installer (runs `npm install` if needed, registers with Devin)
-- `npm run top` — `top`-style TUI over `tasks.json` (reads registry + /proc; server not required)
+- `npm run task_runner_top` — `top`-style TUI over `tasks.json` (reads registry + /proc; server not required)
 
 ## Dogfooding: use local_llm itself
 
