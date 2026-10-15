@@ -55,7 +55,7 @@ function meta(t: import("./tasks.ts").TaskMeta): Record<string, unknown> {
   };
 }
 
-export function registerTaskTools(reg: Registrar, tasks: TaskRegistry): void {
+export function registerTools(reg: Registrar, tasks: TaskRegistry): void {
   reg.ask(
     "task_start",
     {

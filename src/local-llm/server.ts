@@ -3,7 +3,7 @@ import { RootsListChangedNotificationSchema } from "@modelcontextprotocol/sdk/ty
 import { startServer, serverRegistrar } from "../shared/mcp.ts";
 import { fileURLToPath } from "node:url";
 import { buildContext } from "./context.ts";
-import { INSTRUCTIONS, registerAll } from "./registration.ts";
+import { INSTRUCTIONS, registerTools } from "./registration.ts";
 import { registerPrompts } from "./prompts.ts";
 import { loadPersistedDynamicTools } from "./tools/dynamic.ts";
 import { setRequestTimeout } from "./tools/helpers.ts";
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     instructions: INSTRUCTIONS,
     capabilities: { tools: {}, prompts: {} },
     register: (server) => {
-      registerAll(serverRegistrar(server), ctx);
+      registerTools(serverRegistrar(server), ctx);
       registerPrompts(server);
     },
     afterConnect: async (server) => {

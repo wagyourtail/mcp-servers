@@ -126,7 +126,7 @@ In `~/.config/devin/config.json` (or `~/.claude/settings.json` — same syntax):
 ```
 
 The lists aren't hardcoded: each tool declares its tier at registration (`reg.allow`
-/ `reg.ask` in `src/*/tools/`), and `node src/index.ts --manifest` emits the full
+/ `reg.ask` in `src/*/tools/`), and `node src/cli.ts manifest` emits the full
 `{tools, ask}` map the configure script merges. `ask` = approve button before writes
 hit disk, models download, or processes spawn. Everything else is allow-tier;
 `task_start` is task_runner's only ask tool — kill/stdin/wait are scoped to

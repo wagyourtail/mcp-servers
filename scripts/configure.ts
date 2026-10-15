@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(here, "..");
 const serverPath = join(projectRoot, "src", "index.ts");
+const cliPath = join(projectRoot, "src", "cli.ts");
 const args = argv.slice(2);
 const YES = args.includes("--yes");
 const PRINT_ONLY = args.includes("--print-devin");
@@ -31,7 +32,7 @@ const clientsIdx = args.indexOf("--clients");
 const serversIdx = args.indexOf("--servers");
 
 // --- permissions -------------------------------------------------------------
-// Tool lists are NOT hardcoded here — `index.ts --manifest` runs each server's
+// Tool lists are NOT hardcoded here — `cli.ts manifest` runs each server's
 // real registration into a recorder and emits {tools, ask}. A new tool lands in
 // 'allow' automatically unless its server's ASK_TOOLS set marks it ask-tier.
 
@@ -41,14 +42,14 @@ interface Manifest {
 
 function loadManifest(): Manifest {
   try {
-    const out = execFileSync("node", [serverPath, "--manifest"], {
+    const out = execFileSync("node", [cliPath, "manifest"], {
       cwd: projectRoot,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "inherit"],
     });
     return JSON.parse(out) as Manifest;
   } catch (e) {
-    console.error(`Failed to enumerate tools via ${serverPath} --manifest:`, e instanceof Error ? e.message : e);
+    console.error(`Failed to enumerate tools via ${cliPath} manifest:`, e instanceof Error ? e.message : e);
     process.exit(1);
   }
 }

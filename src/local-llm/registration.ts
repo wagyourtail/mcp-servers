@@ -1,5 +1,5 @@
 // local_llm registration surface — single source for both the live server and
-// `index.ts --manifest` (which enumerates tools + tiers for permission generation).
+// `cli.ts manifest` (which enumerates tools + tiers for permission generation).
 // Tool tiers are declared at each tool's own registration via reg.allow/reg.ask.
 import type { Registrar } from "../shared/mcp.ts";
 import type { ServerContext } from "./context.ts";
@@ -79,7 +79,7 @@ roots; dynamic tools + run_command need env flags.
 Workflow hint: call get_server_info first to see providers/roots/flags/mode, and
 get_usage_stats at the end of a session to see what you saved.`;
 
-export function registerAll(reg: Registrar, ctx: ServerContext): void {
+export function registerTools(reg: Registrar, ctx: ServerContext): void {
   registerCompletionTools(reg, ctx);
   registerFileTaskTools(reg, ctx);
   registerDelegateTools(reg, ctx);

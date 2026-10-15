@@ -32,7 +32,7 @@ fits its strengths, delegate instead of doing it in-context — that's the produ
   `env_source` rather than silently reporting no pinning.
 - Tool permission tiers are declared at registration: read-only tools register
   via `reg.allow(...)`, anything that writes/deletes/pulls/spawns via `reg.ask(...)`.
-  `node src/index.ts --manifest` emits the `{tools, ask}` map that
+  `node src/cli.ts manifest` emits the `{tools, ask}` map that
   `scripts/configure.ts` merges into client permissions — no parallel tool list.
 - Staged writes: nothing the local model writes reaches disk without `commit_write`.
 - Tool docs: `npm run docs` regenerates `docs/<server>.md` from the same

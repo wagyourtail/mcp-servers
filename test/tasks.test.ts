@@ -223,7 +223,7 @@ test("top TUI renders the registry and quits on q (non-tty)", async () => {
     const out = await new Promise<string>((resolve, reject) => {
       const p = execFile(
         process.execPath,
-        ["src/index.ts", "task_runner_top"],
+        ["src/cli.ts", "task_runner_top"],
         { env: { ...process.env, TASKD_STATE_DIR: dir }, cwd: process.cwd() },
         (e, stdout) => (e ? reject(e) : resolve(stdout)),
       );

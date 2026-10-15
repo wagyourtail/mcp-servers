@@ -29,7 +29,7 @@ export interface ServerSpec {
 // --- Tool registry -----------------------------------------------------------
 // Every tool declares its permission tier at its own registration site via
 // reg.allow/reg.ask — the tool name and its default tier can't drift apart.
-// `index.ts --manifest` runs the same registration into a recording Registrar
+// `cli.ts manifest` runs the same registration into a recording Registrar
 // so scripts/configure.ts derives permission lists from real registrations.
 
 /** registerTool's config arg — generics erased so spec/handler stay concrete. */

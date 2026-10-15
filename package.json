@@ -11,9 +11,9 @@
     "test": "node --test test/*.test.ts",
     "smoke": "node scripts/smoke.ts",
     "configure": "node scripts/configure.ts",
-    "docs": "node src/index.ts --docs",
-    "docs:check": "node src/index.ts --docs --check",
-    "task_runner_top": "node src/index.ts task_runner_top"
+    "docs": "node src/cli.ts docs",
+    "docs:check": "node src/cli.ts docs --check",
+    "task_runner_top": "node src/cli.ts task_runner_top"
   },
   "engines": {
     "node": ">=22.18.0"
