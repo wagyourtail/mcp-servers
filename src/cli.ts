@@ -98,15 +98,25 @@ if (cmd === "docs") {
   process.exit(stale ? 1 : 0);
 }
 
-if (cmd === "task_runner_top") {
-  // TUI — pure builtins, no deps needed.
-  await import("./task-runner/top.ts");
+// Per-server commands: `<server>_<cmd>` → src/<server>/cli/<cmd>.ts, so each
+// server ships its own dev tools (e.g. task_runner_top → task-runner/cli/top.ts).
+const srvMatch = Object.keys(SERVERS).find((s) => cmd === s || cmd.startsWith(`${s}_`));
+if (srvMatch && cmd !== srvMatch) {
+  const sub = cmd.slice(srvMatch.length + 1);
+  const dashed = srvMatch.replace(/_/g, "-");
+  try {
+    await import(`./${dashed}/cli/${sub}.ts`);
+  } catch {
+    console.error(`no such command '${cmd}' — expected src/${dashed}/cli/${sub}.ts to exist`);
+    process.exit(2);
+  }
 } else {
   console.error(
     `usage: node src/cli.ts <command>\n\n` +
-      `  manifest           tool/tier manifest JSON (drives client permissions)\n` +
+      `  manifest              tool/tier manifest JSON (drives client permissions)\n` +
       `  docs [--check] [dir]  render docs/<server>.md + README server list\n` +
-      `  task_runner_top    \`top\` TUI for task_runner tasks\n\n` +
+      `  <server>_<cmd>        per-server command — src/<server>/cli/<cmd>.ts\n` +
+      `                        (task_runner_top → \`top\` TUI for task_runner tasks)\n\n` +
       `MCP servers launch via index.ts: ${Object.keys(SERVERS).join(", ")}`,
   );
   process.exit(cmd ? 2 : 0);
