@@ -3,6 +3,9 @@
 Collection of MCP servers. `local_llm` offloads low-complexity work (summarize/extract/classify/map_files,
 run_local_agent, staged writes, model management) to a local ollama or
 OpenAI-compatible model. Entry point `src/index.ts` (deps preflight → `server.ts`).
+Dev/human commands go through `src/cli.ts`: global commands live in `src/cli/`,
+per-server ones in `src/<server>/cli/<cmd>.ts` reachable as `cli.ts <server>_<cmd>` —
+a new file is a new command (no registration; its first `//` line is the help text).
 
 ## Commands
 

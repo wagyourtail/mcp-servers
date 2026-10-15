@@ -3,16 +3,19 @@
 // Adding a server = one entry here + a src/<name>/ folder whose registration
 // module exports registerTools(reg, ctx), SUMMARY, and INSTRUCTIONS.
 
-// Paths are relative to src/ — consumers (index.ts, cli.ts) live there and
-// dynamic import() resolves against the importing file, not this one.
+// file:// URLs resolved against this file's location — dynamic import()
+// resolves against the *importing* file, so plain relative paths break for
+// importers outside src/.
+const SRC = new URL("../", import.meta.url);
+
 export const SERVERS = {
   local_llm: {
-    server: "./local-llm/server.ts",
-    registration: "./local-llm/registration.ts",
+    server: new URL("local-llm/server.ts", SRC).href,
+    registration: new URL("local-llm/registration.ts", SRC).href,
   },
   task_runner: {
-    server: "./task-runner/server.ts",
-    registration: "./task-runner/tools.ts",
+    server: new URL("task-runner/server.ts", SRC).href,
+    registration: new URL("task-runner/tools.ts", SRC).href,
   },
 } as const;
 
