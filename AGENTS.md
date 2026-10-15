@@ -34,3 +34,8 @@ fits its strengths, delegate instead of doing it in-context — that's the produ
   `node src/index.ts --manifest` emits the `{tools, ask}` map that
   `scripts/configure.ts` merges into client permissions — no parallel tool list.
 - Staged writes: nothing the local model writes reaches disk without `commit_write`.
+- Tool docs: `npm run docs` regenerates `docs/<server>.md` from the same
+  registrations the live servers run — keep it in the same commit as tool
+  changes (`npm run docs:check` verifies). For human-only elaboration
+  (examples, caveats too long for model context) add a `doc:` field to the
+  tool's registration spec — it's stripped before registerTool.

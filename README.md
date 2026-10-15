@@ -101,6 +101,11 @@ registry-managed tasks.
 
 ## Tools
 
+> Full per-tool reference — descriptions, parameters, types, defaults — is generated
+> from the live registrations: [docs/local_llm.md](docs/local_llm.md) and
+> [docs/task_runner.md](docs/task_runner.md) (`npm run docs` regenerates;
+> `npm run docs:check` verifies freshness). The tables below are a summary.
+
 | Tool | What it does |
 |---|---|
 | `run_local_agent` | **Local subagent.** Small model runs its own tool loop; returns final answer + staged op ids. `verify:"self"` adds a critique pass. Sync calls wait up to `agent_sync_grace_ms` (default 45s), then return a `job_id` instead of losing the result; `run_async:true` skips the wait and returns a job immediately (poll `get_job`). |
@@ -269,5 +274,7 @@ npm install
 npm test            # unit tests (node:test)
 npm run smoke       # end-to-end: spawns server, hits real ollama
 npm run build       # optional: emit dist/ for node<22.18 or distribution
+npm run docs        # regenerate docs/<server>.md from live tool registrations
+npm run docs:check  # fail if docs/ is stale (CI)
 node src/index.ts   # run the server standalone (stdin MCP)
 ```

@@ -3,6 +3,8 @@ import { McpServer, type ToolCallback } from "@modelcontextprotocol/sdk/server/m
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 /** Standard tool result: JSON in text + structuredContent. */
 export function jsonResult(obj: Record<string, unknown>) {
@@ -34,6 +36,9 @@ export interface ServerSpec {
 export interface ToolSpec {
   title?: string;
   description?: string;
+  /** Human-facing docs (longer prose, examples) — rendered by `--docs`,
+   *  stripped before registerTool so it never costs model context. */
+  doc?: string;
   inputSchema?: ZodRawShapeCompat;
   outputSchema?: ZodRawShapeCompat;
   annotations?: ToolAnnotations;
@@ -51,14 +56,27 @@ export interface Registrar {
 /** Registrar that installs tools on a live MCP server (tier is metadata only). */
 export function serverRegistrar(server: McpServer): Registrar {
   const put = (name: string, spec: ToolSpec, handler: ToolHandler): void => {
-    server.registerTool(name, spec as never, handler as never);
+    const { doc: _doc, ...modelSpec } = spec;
+    server.registerTool(name, modelSpec as never, handler as never);
   };
   return { allow: put, ask: put };
+}
+
+/** One tool's recorded declaration — name, tier, and its spec for doc rendering. */
+export interface ToolDoc {
+  name: string;
+  ask: boolean;
+  description?: string;
+  doc?: string;
+  /** JSON Schema for inputSchema (converted from zod), if any. */
+  params?: Record<string, unknown>;
 }
 
 export interface ToolManifest {
   tools: string[];
   ask: string[];
+  /** Full tool records in registration order — for `--docs` and tooling. */
+  specs: ToolDoc[];
 }
 
 /**
@@ -67,16 +85,33 @@ export interface ToolManifest {
  * time (handlers close over it but never run); manifest mode passes stubs.
  */
 export function collectManifest(register: (reg: Registrar) => void): ToolManifest {
-  const tools: string[] = [];
-  const ask: string[] = [];
+  const specs: ToolDoc[] = [];
+  const rec = (name: string, spec: ToolSpec, ask: boolean): void => {
+    specs.push({
+      name,
+      ask,
+      description: spec.description,
+      doc: spec.doc,
+      params: toJsonSchema(spec.inputSchema),
+    });
+  };
   register({
-    allow: (name) => tools.push(name),
-    ask: (name) => {
-      tools.push(name);
-      ask.push(name);
-    },
+    allow: (name, spec) => rec(name, spec, false),
+    ask: (name, spec) => rec(name, spec, true),
   });
-  return { tools, ask };
+  return { tools: specs.map((s) => s.name), ask: specs.filter((s) => s.ask).map((s) => s.name), specs };
+}
+
+/** Convert a zod raw shape to a JSON Schema object; undefined on failure/absence. */
+function toJsonSchema(shape: ZodRawShapeCompat | undefined): Record<string, unknown> | undefined {
+  if (!shape) return undefined;
+  try {
+    const s = zodToJsonSchema(z.object(shape as never), { target: "openApi3" }) as Record<string, unknown>;
+    delete s.$schema;
+    return s;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function startServer(spec: ServerSpec): Promise<void> {

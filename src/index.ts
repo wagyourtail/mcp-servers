@@ -30,6 +30,40 @@ if (arg === "--manifest") {
   process.exit(0);
 }
 
+if (arg === "--docs") {
+  // Render docs/<server>.md per server from the same registrations the live
+  // servers run. Usage: `node src/index.ts --docs [outdir]` (default: docs/).
+  assertDeps("local_llm");
+  const check = process.argv.includes("--check");
+  const outdir = process.argv[3] && !process.argv[3].startsWith("--") ? process.argv[3] : "docs";
+  const { existsSync, mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { collectManifest } = await import("./shared/mcp.ts");
+  const { renderServerDocs } = await import("./shared/gendocs.ts");
+  const llm = await import("./local-llm/registration.ts");
+  const task = await import("./task-runner/tools.ts");
+  const servers = [
+    { name: "local_llm", instructions: llm.INSTRUCTIONS, manifest: collectManifest((reg) => llm.registerAll(reg, undefined as never)) },
+    { name: "task_runner", instructions: task.INSTRUCTIONS, manifest: collectManifest((reg) => task.registerTaskTools(reg, undefined as never)) },
+  ];
+  mkdirSync(outdir, { recursive: true });
+  let stale = 0;
+  for (const s of servers) {
+    const path = join(outdir, `${s.name}.md`);
+    const md = renderServerDocs(s.name, s.instructions, s.manifest.specs);
+    if (check) {
+      if (!existsSync(path) || readFileSync(path, "utf-8") !== md) {
+        console.error(`stale: ${path} — run \`npm run docs\``);
+        stale++;
+      }
+    } else {
+      writeFileSync(path, md);
+      console.log(`wrote ${path} (${s.manifest.tools.length} tools)`);
+    }
+  }
+  process.exit(stale ? 1 : 0);
+}
+
 if (!(arg in SERVERS)) {
   console.error(`unknown server '${arg}' — expected one of: ${Object.keys(SERVERS).join(", ")}`);
   process.exit(2);

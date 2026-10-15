@@ -10,7 +10,9 @@
     "build": "tsc -p tsconfig.json",
     "test": "node --test test/*.test.ts",
     "smoke": "node scripts/smoke.ts",
-    "configure": "node scripts/configure.ts"
+    "configure": "node scripts/configure.ts",
+    "docs": "node src/index.ts --docs",
+    "docs:check": "node src/index.ts --docs --check"
   },
   "engines": {
     "node": ">=22.18.0"
@@ -18,7 +20,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0",
     "diff": "^8.0.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

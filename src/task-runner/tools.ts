@@ -2,6 +2,32 @@ import { z } from "zod";
 import { jsonResult, type Registrar } from "../shared/mcp.ts";
 import type { TaskRegistry } from "./tasks.ts";
 
+export const INSTRUCTIONS = `task_runner manages detached LONG-RUNNING processes: build watchers, dev
+servers, test loops, downloads — anything you'd otherwise run in a terminal tab
+and lose track of.
+
+WHEN TO USE:
+- Starting/backgrounding a process you need to keep alive across the session:
+  task_start returns an id + log path; stdout+stderr stream to the log file.
+- Checking on things later: task_list / task_status / task_log (tailed reads —
+  don't poll the whole file).
+- Stopping: task_kill signals the whole process group (SIGTERM, SIGKILL after a
+  grace period). task_stdin feeds interactive tasks started with stdin:true.
+- Waiting: task_wait {id, seconds} returns early when the task exits — use it
+  instead of sleep-polling task_status. 'match' (a regex) also returns early
+  when a log line matches (e.g. 'listening on :[0-9]+' for a dev server).
+- Restarting: task_restart {id} kills + respawns with the recorded argv/cwd/env —
+  same id and log. Logs are bounded (pruned past 64MB).
+
+Semantics:
+- argv only, no shell — no pipes/redirects/globs. Wrap in ['sh','-c',...] if you
+  need them, and know that defeats injection safety.
+- Tasks are DETACHED: they survive this server restarting. A restarted server
+  reattaches by pid (task_list still shows them; task_stdin won't work on
+  reattached tasks — stdin is process-bound).
+- Logs live under the state dir (default ~/.local/state/taskd/, override with
+  TASKD_STATE_DIR) as <task-id>.log — append-only, not rotated.`;
+
 /** task_wait cap on explicit `seconds` — matches Devin's 600s server-side default.
  *  TASKD_MAX_WAIT_S overrides; -1 lifts the cap. `seconds:-1` itself always
  *  means "wait until the task exits", uncapped. */
