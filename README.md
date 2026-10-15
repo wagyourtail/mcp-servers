@@ -149,7 +149,7 @@ This repo also ships `task_runner` (registered by `npm run configure` alongside 
 | `task_stdin` | Write to a task's stdin (requires `stdin:true` at start; unavailable on reattached tasks). |
 | `task_kill` | Signal the whole process group — SIGTERM default, SIGKILL after `grace_ms`. |
 | `task_restart` | Kill + respawn with the recorded argv/cwd/env — same id and log. Ask-tier like `task_start` (it launches a process). |
-| `task_wait` | Return early when the task exits (up to `seconds`, max 600 — `TASKD_MAX_WAIT_S` env overrides) — no busy polling. `match:"regex"` also returns early when a log line matches (e.g. `listening on :\d+`). |
+| `task_wait` | Return early when the task exits (up to `seconds`, max 600 — `TASKD_MAX_WAIT_S` env overrides, `-1` uncaps; `seconds:-1` waits until exit) — no busy polling. `match:"regex"` also returns early when a log line matches (e.g. `listening on :\d+`). |
 
 Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF).
 

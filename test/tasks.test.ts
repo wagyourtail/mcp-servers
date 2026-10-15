@@ -56,7 +56,12 @@ test("wait returns early on exit, times out on a sleeper", async () => {
     const slow = tasks.start({ argv: [NODE, "-e", "setInterval(()=>{},1000)"] });
     const { task: timed } = await tasks.wait(slow.id, 1);
     assert.equal(timed.status, "running");
+    // -1 = unbounded wait; resolves only when the task exits.
+    const pending = tasks.wait(slow.id, -1);
+    await new Promise((r) => setTimeout(r, 300));
     await tasks.kill(slow.id, "SIGKILL", 0);
+    const { task: unbounded } = await pending;
+    assert.equal(unbounded.status, "killed");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

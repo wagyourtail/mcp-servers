@@ -282,8 +282,9 @@ export class TaskRegistry {
 
   /**
    * Resolve when the task leaves `running`, `seconds` elapse, or (with `match`)
-   * a line matching the regex appears in the log — whichever first. A final
-   * scan runs after exit so output flushed just before death still matches.
+   * a line matching the regex appears in the log — whichever first. `seconds < 0`
+   * waits indefinitely. A final scan runs after exit so output flushed just
+   * before death still matches.
    */
   async wait(id: string, seconds: number, match?: string): Promise<TaskWaitResult> {
     const task = this.tasks.get(id);
@@ -305,7 +306,7 @@ export class TaskRegistry {
       }
       return false;
     };
-    const deadline = Date.now() + seconds * 1000;
+    const deadline = seconds < 0 ? Infinity : Date.now() + seconds * 1000;
     while (Date.now() < deadline) {
       if (scan()) break;
       pruneLog(meta.logPath);
