@@ -41,29 +41,47 @@ free-tier version of cloud subagents.
 
 ## Setup
 
-### 1. Server config
+### Automatic — `npm run configure` (recommended)
 
 ```bash
-npm install           # required once — the server refuses to start without node_modules
-npm run configure     # interactive wizard: runs `npm install` itself if node_modules is missing,
-                      # probes ollama, writes ~/.config/openai-mcp/config.json, prefills from an
-                      # existing config (update mode), then covers steps 2 & 3 below — installs the
-                      # server into ~/.config/devin/mcp_config.json AND merges recommended
-                      # permissions into ~/.config/devin/config.json (backs both up first)
-# or: npm install && cp config.example.json ~/.config/openai-mcp/config.json  (edit by hand)
+npm run configure
+```
+
+One wizard does everything: installs deps if missing, probes your ollama,
+writes `~/.config/openai-mcp/config.json` (prefills from an existing config —
+rerun it to update settings), picks which servers to install (all by default),
+detects installed clients (Devin, Claude Code, Cursor, Windsurf, VS Code, Zed,
+Junie, Copilot-for-IntelliJ), writes each client's MCP config **and** merges
+recommended allow/ask permissions where the client supports them — backing up
+every file it touches.
+
+```bash
+npm run configure -- --yes                    # accept all defaults non-interactively
+npm run configure -- --clients devin,cursor   # subset of clients ('all' = every known client)
+npm run configure -- --servers local_llm      # subset of servers
+npm run configure -- --no-install --print-devin   # just print the mcpServers block to paste
 ```
 
 **File roots are auto-detected.** Effective roots = `allowed_roots` (config) ∪ workspace roots the
-MCP client advertises (the spec's `roots` capability) ∪ the directory Devin spawned the server from
+MCP client advertises (the spec's `roots` capability) ∪ the directory the client spawned the server from
 (= your project dir, controlled by `trust_cwd: true`). So file tools work out of the box inside the
 project, and `allowed_roots` is for *extra* directories outside it. `deny_globs` blocks secrets
 everywhere. `get_server_info` shows each root with its source.
 
-### 2. Register with your MCP client
+### Manual
 
-*`npm run configure` does this for you — it detects and offers Devin, Claude Code, Cursor, Windsurf, VS Code, Zed, Junie (JetBrains), and Copilot-for-IntelliJ (`--clients devin,cursor`, `all`, or `none`). Shown here for manual setup — the `mcpServers` envelope works in Devin, Claude Code, Cursor, Windsurf, and Junie as-is.*
+<details><summary>Do the three steps configure automates, by hand</summary>
 
-**Devin settings → MCP → Add custom MCP** (or edit `~/.config/devin/mcp_config.json`):
+**1. Server config**
+
+```bash
+npm install && cp config.example.json ~/.config/openai-mcp/config.json   # then edit
+```
+
+**2. Register with your MCP client**
+
+The `mcpServers` envelope works verbatim in Devin (`~/.config/devin/mcp_config.json`),
+Claude Code (`~/.claude.json`), Cursor (`~/.cursor/mcp.json`), Windsurf, and Junie:
 
 ```json
 {
@@ -76,25 +94,25 @@ everywhere. `get_server_info` shows each root with its source.
         "LOCAL_LLM_RUN_COMMAND": "1",
         "LOCAL_LLM_DYNAMIC_TOOLS": "1"
       }
+    },
+    "task_runner": {
+      "command": "node",
+      "args": ["/path/to/mcp-servers/src/index.ts", "task_runner"]
     }
   }
 }
 ```
 
-Provider entries also accept `think` (bool or `"low"/"medium"/"high"`), `options`
-(provider-native request overrides), `temperature`, `num_ctx`, and `keep_alive` — defaults applied
-to every call; per-request args override them. The `configure` wizard asks about `think` since
-thinking-capable models can eat the whole `max_tokens` budget.
-
-CLI equivalent: `devin mcp add -s user local_llm -- node /path/to/mcp-servers/src/index.ts`
+Other envelopes: VS Code and Copilot-for-IntelliJ use a `servers` key with `"type": "stdio"` on
+each entry (`mcp.servers` in VS Code user settings; `~/.local/share/github-copilot/intellij/mcp.json`
+for Copilot); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`.
+IntelliJ's built-in AI Assistant stores MCP config in IDE options XML — configure it via
+Settings → Tools → AI Assistant → Model Context Protocol.
 
 Omit the two `LOCAL_LLM_*` env flags to disable shell access and dynamic tools entirely.
+Devin CLI equivalent: `devin mcp add -s user local_llm -- node /path/to/mcp-servers/src/index.ts`
 
-Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/path/to/mcp-servers/src/index.ts", "task_runner"]}`. VS Code and Copilot-for-IntelliJ use a `servers` key with `"type": "stdio"` on each entry (`mcp.servers` in VS Code user settings; `~/.local/share/github-copilot/intellij/mcp.json` for Copilot); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`. IntelliJ's built-in AI Assistant stores MCP config in IDE options XML — configure it via Settings → Tools → AI Assistant → Model Context Protocol.
-
-### 3. Recommended Devin permissions
-
-*`npm run configure` merges these for you (with a backup) — shown here for manual setup.*
+**3. Permissions (Devin / Claude Code)**
 
 In `~/.config/devin/config.json` (or `~/.claude/settings.json` — same syntax):
 
@@ -113,6 +131,16 @@ The lists aren't hardcoded: each tool declares its tier at registration (`reg.al
 hit disk, models download, or processes spawn. Everything else is allow-tier;
 `task_start` is task_runner's only ask tool — kill/stdin/wait are scoped to
 registry-managed tasks.
+
+</details>
+
+### Provider config notes
+
+Provider entries in `config.json` accept `think` (bool or `"low"/"medium"/"high"`),
+`options` (provider-native request overrides), `temperature`, `num_ctx`, and
+`keep_alive` — defaults applied to every call; per-request args override them.
+The `configure` wizard asks about `think` since thinking-capable models can eat
+the whole `max_tokens` budget.
 
 ## Tools
 
