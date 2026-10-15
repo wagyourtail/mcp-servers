@@ -214,3 +214,24 @@ test("custom log path: resolves against cwd, created, survives restart, no prune
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("top TUI renders the registry and quits on q (non-tty)", async () => {
+  const { dir, tasks } = setup();
+  try {
+    tasks.start({ argv: [NODE, "-e", "console.log('top-test-line')" ] });
+    const { execFile } = await import("node:child_process");
+    const out = await new Promise<string>((resolve, reject) => {
+      const p = execFile(
+        process.execPath,
+        ["src/index.ts", "top"],
+        { env: { ...process.env, TASKD_STATE_DIR: dir }, cwd: process.cwd() },
+        (e, stdout) => (e ? reject(e) : resolve(stdout)),
+      );
+      setTimeout(() => p.stdin!.write("q"), 800);
+    });
+    assert.match(out, /tasktop/);
+    assert.match(out, /running|exited/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

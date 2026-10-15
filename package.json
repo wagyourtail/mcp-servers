@@ -12,7 +12,8 @@
     "smoke": "node scripts/smoke.ts",
     "configure": "node scripts/configure.ts",
     "docs": "node src/index.ts --docs",
-    "docs:check": "node src/index.ts --docs --check"
+    "docs:check": "node src/index.ts --docs --check",
+    "top": "node src/index.ts top"
   },
   "engines": {
     "node": ">=22.18.0"

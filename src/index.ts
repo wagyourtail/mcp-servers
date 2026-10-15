@@ -98,10 +98,15 @@ if (arg === "--docs") {
   process.exit(stale ? 1 : 0);
 }
 
-if (!(arg in SERVERS)) {
-  console.error(`unknown server '${arg}' — expected one of: ${Object.keys(SERVERS).join(", ")}`);
-  process.exit(2);
+if (arg === "top") {
+  // TUI: `top` for task_runner tasks — pure builtins, no deps needed.
+  await import("./task-runner/top.ts");
+} else {
+  if (!(arg in SERVERS)) {
+    console.error(`unknown server '${arg}' — expected one of: ${Object.keys(SERVERS).join(", ")} (or 'top' for the task TUI)`);
+    process.exit(2);
+  }
+  const name = arg as ServerName;
+  assertDeps(name);
+  await import(SERVERS[name]);
 }
-const name = arg as ServerName;
-assertDeps(name);
-await import(SERVERS[name]);
