@@ -143,7 +143,7 @@ This repo also ships `task_runner` (registered by `npm run configure` alongside 
 
 | Tool | What it does |
 |---|---|
-| `task_start` | Spawn a detached process (`argv`, no shell; optional `name`/`cwd`/`env`/`stdin`). Survives server restarts. stdout+stderr append to `<id>.log` in the state dir (`~/.local/state/taskd/`, override `TASKD_STATE_DIR`). |
+| `task_start` | Spawn a detached process (`argv`, no shell; optional `name`/`cwd`/`env`/`stdin`/`log`). Survives server restarts. stdout+stderr append to `<id>.log` in the state dir (`~/.local/state/taskd/`, override `TASKD_STATE_DIR`) — or pass `log` to pick the file (relative to `cwd`, dirs created, exempt from auto-prune). |
 | `task_list` / `task_status` | All known tasks (reattached after restarts) / one task's status, pid, exit code, log path. |
 | `task_log` | Tail the task's combined log (`lines`, `max_bytes`). |
 | `task_stdin` | Write to a task's stdin (requires `stdin:true` at start; unavailable on reattached tasks). |
@@ -151,7 +151,7 @@ This repo also ships `task_runner` (registered by `npm run configure` alongside 
 | `task_restart` | Kill + respawn with the recorded argv/cwd/env — same id and log. Ask-tier like `task_start` (it launches a process). |
 | `task_wait` | Return early when the task exits (up to `seconds`, max 600 — `TASKD_MAX_WAIT_S` env overrides, `-1` uncaps; `seconds:-1` waits until exit) — no busy polling. `match:"regex"` also returns early when a log line matches (e.g. `listening on :\d+`). |
 
-Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF).
+Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF). Logs at a caller-chosen `log` path are never pruned.
 
 Both servers launch through one entry: `node src/index.ts` (defaults to `local_llm`) or `node src/index.ts task_runner`. Server code lives in `src/local-llm/` and `src/task-runner/`; `src/shared/` (`preflight.ts` dep-check + `mcp.ts` bootstrap) is the common kit — add another server by writing `src/<name>/server.ts` and one line in `index.ts`'s `SERVERS` map.
 

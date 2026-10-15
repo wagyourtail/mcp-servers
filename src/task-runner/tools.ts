@@ -38,9 +38,15 @@ export function registerTaskTools(reg: Registrar, tasks: TaskRegistry): void {
         cwd: z.string().optional().describe("Working directory (default: server cwd)"),
         env: z.record(z.string(), z.string()).optional().describe("Extra env vars (merged over process env)"),
         stdin: z.boolean().optional().describe("Keep a stdin pipe open for task_stdin"),
+        log: z.string().optional().describe(
+          "Log file path (default: per-task file in the taskd state dir). " +
+          "Relative paths resolve against the task cwd; parent dirs are created. " +
+          "Caller-chosen logs are NOT auto-pruned past 64MB.",
+        ),
       },
     },
-    async ({ argv, name, cwd, env, stdin }) => jsonResult(meta(tasks.start({ argv, name, cwd, env, stdin }))),
+    async ({ argv, name, cwd, env, stdin, log }) =>
+      jsonResult(meta(tasks.start({ argv, name, cwd, env, stdin, log }))),
   );
 
   reg.allow(

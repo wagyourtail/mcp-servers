@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 export type TaskStatus = "running" | "exited" | "killed" | "lost";
 
@@ -29,6 +29,8 @@ export interface TaskMeta {
   stdin?: boolean;
   pid: number;
   logPath: string;
+  /** Caller-chosen logPath — exempt from the 64MB auto-prune. */
+  customLog?: boolean;
   startedAt: string;
   status: TaskStatus;
   exitCode?: number | null;
@@ -48,6 +50,9 @@ export interface TaskStartOptions {
   env?: Record<string, string>;
   /** Pipe stdin (only usable while this server process stays alive). */
   stdin?: boolean;
+  /** Log file location — relative paths resolve against the task's cwd.
+   *  Caller-chosen logs are unbounded (no auto-prune). */
+  log?: string;
 }
 
 export interface TaskLogResult {
@@ -188,18 +193,22 @@ export class TaskRegistry {
   start(opts: TaskStartOptions): TaskMeta {
     if (!opts.argv.length || !opts.argv[0]) throw new Error("argv must be a non-empty array");
     const id = randomBytes(6).toString("hex");
+    const cwd = opts.cwd ? resolve(opts.cwd) : process.cwd();
+    const logPath = opts.log ? resolve(cwd, opts.log) : join(this.stateDir, `${id}.log`);
     const meta: TaskMeta = {
       id,
       name: opts.name,
       argv: opts.argv,
-      cwd: opts.cwd ? resolve(opts.cwd) : process.cwd(),
+      cwd,
       env: opts.env,
       stdin: opts.stdin,
       pid: 0,
-      logPath: join(this.stateDir, `${id}.log`),
+      logPath,
+      customLog: opts.log !== undefined || undefined,
       startedAt: new Date().toISOString(),
       status: "running",
     };
+    mkdirSync(dirname(logPath), { recursive: true });
     const task: LiveTask = { meta };
     this.tasks.set(id, task);
     this.spawnFor(task);
@@ -244,7 +253,7 @@ export class TaskRegistry {
     const meta = this.get(id);
     if (!meta) throw new Error(`no task ${id}`);
     if (!existsSync(meta.logPath)) return { path: meta.logPath, bytes: 0, truncated: false, tail: "" };
-    pruneLog(meta.logPath);
+    if (!meta.customLog) pruneLog(meta.logPath);
     const size = statSync(meta.logPath).size;
     const fd = openSync(meta.logPath, "r");
     try {
@@ -309,7 +318,7 @@ export class TaskRegistry {
     const deadline = seconds < 0 ? Infinity : Date.now() + seconds * 1000;
     while (Date.now() < deadline) {
       if (scan()) break;
-      pruneLog(meta.logPath);
+      if (!meta.customLog) pruneLog(meta.logPath);
       if (meta.status !== "running" || !pidAlive(meta.pid)) break;
       await new Promise((r) => setTimeout(r, 200));
     }

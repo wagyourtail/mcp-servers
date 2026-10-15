@@ -190,3 +190,27 @@ test("restart respawns with the same id, argv and log", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("custom log path: resolves against cwd, created, survives restart, no prune flag", async () => {
+  const { dir, tasks } = setup();
+  try {
+    const t = tasks.start({
+      argv: [NODE, "-e", "console.log('custom-log-out')"],
+      cwd: dir,
+      log: "logs/dev.log",
+    });
+    assert.equal(t.logPath, join(dir, "logs", "dev.log"));
+    assert.equal(t.customLog, true);
+    await tasks.wait(t.id, 10);
+    const log = tasks.log(t.id);
+    assert.match(log.tail, /custom-log-out/);
+
+    // restart appends to the same caller-chosen file
+    const t2 = tasks.start({ argv: [NODE, "-e", "setInterval(()=>{},1000)"], log: t.logPath });
+    await tasks.restart(t2.id);
+    assert.equal(t2.logPath, t.logPath);
+    await tasks.kill(t2.id, "SIGKILL", 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
