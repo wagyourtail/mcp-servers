@@ -235,7 +235,7 @@ async function main(): Promise<void> {
     return a.startsWith("y");
   };
 
-  console.log("openai-mcp config builder\n");
+  console.log("mcp-servers config builder\n");
 
   // --- deps: the server crashes at spawn with ERR_MODULE_NOT_FOUND without them ---
   if (!existsSync(join(projectRoot, "node_modules", "@modelcontextprotocol"))) {

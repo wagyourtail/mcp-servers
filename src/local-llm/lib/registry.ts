@@ -23,7 +23,7 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 
 export const defaultFetcher: Fetcher = async (url, headers = {}) => {
   const res = await fetch(url, {
-    headers: { "user-agent": "openai-mcp", ...headers },
+    headers: { "user-agent": "mcp-servers", ...headers },
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);

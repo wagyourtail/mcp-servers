@@ -49,7 +49,7 @@ if (arg === "--docs") {
   const { existsSync, mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
   const { join } = await import("node:path");
   const { collectManifest } = await import("./shared/mcp.ts");
-  const { renderServerDocs } = await import("./shared/gendocs.ts");
+  const { renderServerDocs, renderServersBlock, updateReadmeServers } = await import("./shared/gendocs.ts");
   const llm = await import("./local-llm/registration.ts");
   const task = await import("./task-runner/tools.ts");
   const servers = [
@@ -69,6 +69,30 @@ if (arg === "--docs") {
     } else {
       writeFileSync(path, md);
       console.log(`wrote ${path} (${s.manifest.tools.length} tools)`);
+    }
+  }
+  // README's marked server-list block gets the same treatment.
+  const block = renderServersBlock(
+    servers.map((s) => ({
+      name: s.name,
+      summary: s.summary,
+      toolCount: s.manifest.tools.length,
+      askCount: s.manifest.ask.length,
+    })),
+  );
+  const readmePath = "README.md";
+  const BEGIN = "<!-- GENERATED:SERVERS -->", END = "<!-- /GENERATED:SERVERS -->";
+  const expected = `${BEGIN}\n${block}\n${END}`;
+  const cur = existsSync(readmePath) ? readFileSync(readmePath, "utf-8") : "";
+  const b = cur.indexOf(BEGIN), e = cur.indexOf(END);
+  if (b !== -1 && e > b) {
+    if (check) {
+      if (cur.slice(b, e + END.length) !== expected) {
+        console.error(`stale: ${readmePath} server list — run \`npm run docs\``);
+        stale++;
+      }
+    } else if (updateReadmeServers(readmePath, block) === "updated") {
+      console.log(`updated ${readmePath} server list`);
     }
   }
   process.exit(stale ? 1 : 0);

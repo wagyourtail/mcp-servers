@@ -1,6 +1,6 @@
-# openai-mcp
+# mcp-servers
 
-MCP server that offloads low-complexity work (summarize/extract/classify/map_files,
+Collection of MCP servers. `local_llm` offloads low-complexity work (summarize/extract/classify/map_files,
 run_local_agent, staged writes, model management) to a local ollama or
 OpenAI-compatible model. Entry point `src/index.ts` (deps preflight → `server.ts`).
 

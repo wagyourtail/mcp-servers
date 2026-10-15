@@ -1,12 +1,27 @@
-# openai-mcp — a local subagent for Devin
+# mcp-servers — a personal MCP server collection
 
-An MCP server that lets Devin offload **low-complexity, monotonous work** to a cheap local model
+A repo of MCP servers for Devin and other MCP clients (Claude Code, Cursor, Windsurf,
+VS Code, Zed, Junie, Copilot for IntelliJ). One entry point — `node src/index.ts <server>`
+— serves any of them; `npm run configure` registers them into your clients.
+Per-server tool reference lives in [docs/](docs/) and is generated from the live
+tool registrations (`npm run docs`).
+
+## Servers
+
+<!-- GENERATED:SERVERS -->
+- [`local_llm`](docs/local_llm.md) — Offloads low-complexity, repetitive work — summarize, extract, classify, bulk file transforms, embeddings, staged edits — to a cheap local model (Ollama or OpenAI-compatible) so the client doesn't spend frontier-model context and tokens on it. Includes a local tool-calling agent, reviewable staged writes, whitelisted command exec, and Ollama model management. _42 tools, 12 ask-tier._
+- [`task_runner`](docs/task_runner.md) — Detached long-running processes that survive MCP server restarts — dev servers, watchers, downloads — with per-task logs, process-group kill, stdin, respawn, and regex-aware waiting. _8 tools, 2 ask-tier._
+<!-- /GENERATED:SERVERS -->
+
+## local_llm
+
+The headline server: offload **low-complexity, monotonous work** to a cheap local model
 (Ollama by default, or any OpenAI-compatible endpoint) instead of burning frontier tokens on it.
 
-The headline feature is `run_local_agent`: the small model runs its **own tool loop server-side**
+Its headline feature is `run_local_agent`: the small model runs its **own tool loop server-side**
 (read/search files, run whitelisted commands, stage writes). File contents and intermediate steps
-never enter Devin's context — only a compact final answer comes back. Think of it as a local,
-free-tier version of Devin's cloud subagents.
+never enter the client's context — only a compact final answer comes back. Think of it as a local,
+free-tier version of cloud subagents.
 
 ## Why it actually saves tokens
 
@@ -55,7 +70,7 @@ everywhere. `get_server_info` shows each root with its source.
   "mcpServers": {
     "local_llm": {
       "command": "node",
-      "args": ["/path/to/openai-mcp/src/index.ts"],
+      "args": ["/path/to/mcp-servers/src/index.ts"],
       "env": {
         "LOCAL_LLM_CONFIG": "~/.config/openai-mcp/config.json",
         "LOCAL_LLM_RUN_COMMAND": "1",
@@ -71,11 +86,11 @@ Provider entries also accept `think` (bool or `"low"/"medium"/"high"`), `options
 to every call; per-request args override them. The `configure` wizard asks about `think` since
 thinking-capable models can eat the whole `max_tokens` budget.
 
-CLI equivalent: `devin mcp add -s user local_llm -- node /path/to/openai-mcp/src/index.ts`
+CLI equivalent: `devin mcp add -s user local_llm -- node /path/to/mcp-servers/src/index.ts`
 
 Omit the two `LOCAL_LLM_*` env flags to disable shell access and dynamic tools entirely.
 
-Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/path/to/openai-mcp/src/index.ts", "task_runner"]}`. VS Code and Copilot-for-IntelliJ use a `servers` key with `"type": "stdio"` on each entry (`mcp.servers` in VS Code user settings; `~/.local/share/github-copilot/intellij/mcp.json` for Copilot); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`. IntelliJ's built-in AI Assistant stores MCP config in IDE options XML — configure it via Settings → Tools → AI Assistant → Model Context Protocol.
+Add `task_runner` the same way: `"task_runner": {"command": "node", "args": ["/path/to/mcp-servers/src/index.ts", "task_runner"]}`. VS Code and Copilot-for-IntelliJ use a `servers` key with `"type": "stdio"` on each entry (`mcp.servers` in VS Code user settings; `~/.local/share/github-copilot/intellij/mcp.json` for Copilot); Zed uses `context_servers` with `{"command": {"path", "args"}, "settings": {}}`. IntelliJ's built-in AI Assistant stores MCP config in IDE options XML — configure it via Settings → Tools → AI Assistant → Model Context Protocol.
 
 ### 3. Recommended Devin permissions
 

@@ -1,6 +1,7 @@
 // Render markdown docs for a server's tools from their recorded registrations
 // (`collectManifest` specs). Same source as the live server — docs can't drift.
 import type { ToolDoc } from "./mcp.ts";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 interface JsonParam {
   type?: string;
@@ -79,4 +80,40 @@ export function renderServerDocs(
     out.push(renderParams(s.params), "");
   }
   return out.join("\n");
+}
+
+const SERVERS_BEGIN = "<!-- GENERATED:SERVERS -->";
+const SERVERS_END = "<!-- /GENERATED:SERVERS -->";
+
+export interface ServerEntry {
+  name: string;
+  summary: string;
+  toolCount: number;
+  askCount: number;
+}
+
+/** Render the README server-list block (contents between the markers). */
+export function renderServersBlock(servers: ServerEntry[]): string {
+  const lines = servers.map(
+    (s) =>
+      `- [\`${s.name}\`](docs/${s.name}.md) — ${s.summary} ` +
+      `_${s.toolCount} tools, ${s.askCount} ask-tier._`,
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Rewrite the marked server-list block in README.md. Returns:
+ *  "updated" | "unchanged" | "no-markers" (file or markers absent — skipped).
+ */
+export function updateReadmeServers(readmePath: string, block: string): "updated" | "unchanged" | "no-markers" {
+  if (!existsSync(readmePath)) return "no-markers";
+  const md = readFileSync(readmePath, "utf-8");
+  const b = md.indexOf(SERVERS_BEGIN);
+  const e = md.indexOf(SERVERS_END);
+  if (b === -1 || e === -1 || e < b) return "no-markers";
+  const inner = `${SERVERS_BEGIN}\n${block}\n${SERVERS_END}`;
+  if (md.slice(b, e + SERVERS_END.length) === inner) return "unchanged";
+  writeFileSync(readmePath, md.slice(0, b) + inner + md.slice(e + SERVERS_END.length));
+  return "updated";
 }
