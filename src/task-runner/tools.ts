@@ -2,6 +2,9 @@ import { z } from "zod";
 import { jsonResult, type Registrar } from "../shared/mcp.ts";
 import type { TaskRegistry } from "./tasks.ts";
 
+/** task_wait cap — matches Devin's 600s server-side default; TASKD_MAX_WAIT_S overrides. */
+const MAX_WAIT_S = Math.max(1, Number(process.env.TASKD_MAX_WAIT_S) || 600);
+
 function meta(t: import("./tasks.ts").TaskMeta): Record<string, unknown> {
   return {
     id: t.id,
@@ -112,7 +115,7 @@ export function registerTaskTools(reg: Registrar, tasks: TaskRegistry): void {
         "a dev server coming up. Final log scan happens after exit/timeout.",
       inputSchema: {
         id: z.string(),
-        seconds: z.number().min(0).max(600).describe("Max wait (default 30)").optional(),
+        seconds: z.number().min(0).max(MAX_WAIT_S).describe(`Max wait (default 30, cap ${MAX_WAIT_S})`).optional(),
         match: z.string().optional().describe("Regex — return early when a log line matches"),
       },
     },
