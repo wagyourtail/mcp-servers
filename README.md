@@ -182,7 +182,7 @@ This repo also ships `task_runner` (registered by `npm run configure` alongside 
 
 For a human view: `npm run top` opens a `top`-style TUI over `tasks.json` — live status, CPU%, RSS, age, log tail; `x`/`X` SIGTERM/SIGKILL the selected group, `l` pages the log, `q` quits. Works without the server running (reads the registry + `/proc` directly), and flags `!pid-reused` when a dead pid got recycled by an unrelated process.
 
-Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF). Logs at a caller-chosen `log` path are never pruned.
+Log files are append-only but bounded — past 64MB the log is pruned to its last 8MB with a marker line (safe against concurrent writers; children append at EOF). Logs at a caller-chosen `log` path are never pruned. The registry itself is bounded too: stopped tasks are dropped when older than `TASKD_KEEP_DAYS` (default 14) or beyond `TASKD_KEEP` entries (default 100) — custom logs are kept, state-dir logs go with the entry.
 
 Both servers launch through one entry: `node src/index.ts` (defaults to `local_llm`) or `node src/index.ts task_runner`. Server code lives in `src/local-llm/` and `src/task-runner/`; `src/shared/` (`preflight.ts` dep-check + `mcp.ts` bootstrap) is the common kit — add another server by writing `src/<name>/server.ts` and one line in `index.ts`'s `SERVERS` map.
 

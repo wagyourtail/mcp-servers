@@ -11,6 +11,7 @@ import {
   readFileSync,
   readSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -147,6 +148,7 @@ export class TaskRegistry {
   }
 
   private persist(): void {
+    this.enforceRetention();
     writeFileSync(
       this.registryPath,
       JSON.stringify([...this.tasks.values()].map((t) => t.meta), null, 2),
@@ -246,6 +248,43 @@ export class TaskRegistry {
     return [...this.tasks.values()]
       .map((t) => t.meta)
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  }
+
+  /**
+   * Retention: drop stopped tasks older than TASKD_KEEP_DAYS (default 14; -1 =
+   * no age limit) and cap stopped count at TASKD_KEEP (default 100; -1 = no
+   * cap), oldest first. State-dir logs are deleted with the entry; caller-chosen
+   * `log` files are kept — the file belongs to whoever passed `log:`.
+   */
+  private enforceRetention(): void {
+    const keepDays = Number(process.env.TASKD_KEEP_DAYS ?? 14);
+    const keepCount = Number(process.env.TASKD_KEEP ?? 100);
+    const stopped = [...this.tasks.values()]
+      .map((t) => t.meta)
+      .filter((m) => m.status !== "running")
+      .sort((a, b) => (a.finishedAt ?? a.startedAt).localeCompare(b.finishedAt ?? b.startedAt)); // oldest first
+    const cutoff = keepDays >= 0 ? Date.now() - keepDays * 86400_000 : Infinity;
+    const drop = new Set<string>();
+    for (const m of stopped) {
+      if (Date.parse(m.finishedAt ?? m.startedAt) <= cutoff) drop.add(m.id);
+    }
+    if (keepCount >= 0) {
+      for (const m of stopped) {
+        if (stopped.length - drop.size <= keepCount) break;
+        drop.add(m.id);
+      }
+    }
+    for (const id of drop) {
+      const m = this.tasks.get(id)!.meta;
+      this.tasks.delete(id);
+      if (!m.customLog) {
+        try {
+          unlinkSync(m.logPath);
+        } catch {
+          /* log already gone */
+        }
+      }
+    }
   }
 
   /** Read the task log tail. */

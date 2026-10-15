@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TaskRegistry } from "../src/task-runner/tasks.ts";
@@ -232,6 +232,42 @@ test("top TUI renders the registry and quits on q (non-tty)", async () => {
     assert.match(out, /tasktop/);
     assert.match(out, /running|exited/);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("retention caps stopped count and age, keeps custom logs and running tasks", async () => {
+  const { dir, tasks } = setup();
+  const oldKeep = process.env.TASKD_KEEP, oldDays = process.env.TASKD_KEEP_DAYS;
+  try {
+    const done = tasks.start({ argv: [NODE, "-e", "console.log('x')"] });
+    const running = tasks.start({ argv: [NODE, "-e", "setInterval(()=>{},1000)"] });
+    const custom = tasks.start({ argv: [NODE, "-e", "console.log('y')"], cwd: dir, log: "mine.log" });
+    await tasks.wait(done.id, 10);
+    await tasks.wait(custom.id, 10);
+
+    // count cap: keep at most 1 stopped task → the older one (done) is dropped
+    process.env.TASKD_KEEP = "1";
+    tasks.start({ argv: [NODE, "-e", "0"] }); // any persist() enforces retention
+    assert.equal(tasks.get(done.id), undefined);
+    assert.ok(!existsSync(done.logPath), "state-dir log deleted");
+    assert.ok(existsSync(join(dir, "mine.log")), "custom log kept");
+    assert.equal(tasks.get(running.id)?.status, "running");
+
+    // age limit: backdate the survivor's finishedAt → dropped on next persist
+    process.env.TASKD_KEEP = "100";
+    process.env.TASKD_KEEP_DAYS = "7";
+    const metas = JSON.parse(readFileSync(join(dir, "tasks.json"), "utf-8"));
+    for (const m of metas) if (m.id === custom.id) m.finishedAt = "2000-01-01T00:00:00Z";
+    writeFileSync(join(dir, "tasks.json"), JSON.stringify(metas));
+    const second = new TaskRegistry(dir); // reload picks up old finishedAt → enforceRetention on load's persist
+    assert.equal(second.get(custom.id), undefined);
+    assert.ok(existsSync(join(dir, "mine.log")), "custom log still kept");
+
+    await tasks.kill(running.id, "SIGKILL", 0);
+  } finally {
+    if (oldKeep === undefined) delete process.env.TASKD_KEEP; else process.env.TASKD_KEEP = oldKeep;
+    if (oldDays === undefined) delete process.env.TASKD_KEEP_DAYS; else process.env.TASKD_KEEP_DAYS = oldDays;
     rmSync(dir, { recursive: true, force: true });
   }
 });
